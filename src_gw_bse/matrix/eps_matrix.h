@@ -41,6 +41,7 @@ class EpsMatrix : public CBase_EpsMatrix {
     void convergence_check(CProxy_EpsMatrix cmp_proxy);
     void add_compl_two();
     void multiply_coulb();
+    void prep_diag();
     void createCopy(CProxy_EpsMatrix other, bool todo);
     void recvCopy(std::vector<complex> new_data);
     void setI(CLA_Matrix_interface mat, bool clean);

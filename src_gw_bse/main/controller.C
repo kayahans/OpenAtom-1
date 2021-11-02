@@ -12,7 +12,6 @@
 #include "fft_routines.h"
 #include "CkLoopAPI.h"
 #include "limits.h"
-
 #define eps_rows 20
 #define eps_cols 20
 

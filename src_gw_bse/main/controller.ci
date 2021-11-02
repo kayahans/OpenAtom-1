@@ -376,6 +376,7 @@ module controller {
       }
       when copy_complete() serial {
         s_matrix2D_proxy.multiply_coulb();
+        
       }
       when s_ready() serial {
         CkPrintf("[CONTROLLER] Phase-4 Bare Exchange, Screen Exchange and COH computation\n");
@@ -671,6 +672,7 @@ module controller {
       }
       when found_alpha(double alpha) serial{
         eps_matrix2D_m_proxy.scalar_multiply(1/alpha);
+        eps_matrix2D_m_proxy.prep_diag();
       }
 
       // X = eps_matrix2D_proxy
@@ -768,6 +770,7 @@ module controller {
         STOP_STEP("Iterative inverse completed");
         STOP_BIG_STEP("EPSILON INVERTED");
         mainProxy.done();
+        
 //        thisProxy.EpsilonInverted();
       }
     }

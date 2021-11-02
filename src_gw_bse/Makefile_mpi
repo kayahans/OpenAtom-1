@@ -1,4 +1,5 @@
-CHARMC=/dcsdata/home/kchndrs2/github/charm_pup4/bin/charmc $(OPTS)
+include config.mk
+CHARMC=/Users/kayahan/Software/charm-aa/mpi-darwin-x86_64/bin/charmc $(OPTS)
 
 all: multirun_time
 
@@ -6,8 +7,8 @@ all: multirun_time
 LIBS=build/libmodulemain.a
 
 multirun_time: multirun_time.cpp $(LIBS)
-	$(CHARMC) -c++ mpicxx -c multirun_time.cpp -o multirun_time.o
-	$(CHARMC) -ld++ mpicxx -mpi -nomain-module -o multirun_time multirun_time.o -L./ -L./build/  -module CkMulticast -L/dcsdata/home/kchndrs2/Software/fftw3-install//lib -lfftw3 -lm -lz -llapack -lblas -module CkLoop -module main
+	$(CHARMC) -c++ mpicxx $(CFLAGS) -c multirun_time.cpp -o multirun_time.o
+	$(CHARMC) -ld++ mpicxx -mpi -nomain-module -o multirun_time multirun_time.o -L./ -L./build/  $(LFLAGS) -module CkMulticast  -module CkLoop -module main
 
 clean:
 	make -C libs clean

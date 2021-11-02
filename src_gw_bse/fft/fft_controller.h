@@ -28,6 +28,8 @@ class FFTController : public CBase_FFTController {
     double compute_average_mbz(const double pa,const double pb,const double pc,
                    double *hmatik,
                    const int Na,const int Nb,const int Nc,const int n);
+  
+
   private:
     void destroy_fftw_stuff();
     bool first_time;

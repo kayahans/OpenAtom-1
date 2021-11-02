@@ -7,9 +7,11 @@
 #include "states.h"
 #include "fft_routines.h"
 #include "fft_controller.h"
+#include "../diagonalizer/diagonalizer.h"
 
 #include <cstring> // for memcpy
 using std::memcpy;
+diagData_t* diagData;
 
 #define eps_rows 20
 #define eps_cols 20
@@ -428,6 +430,11 @@ void EpsMatrix::receiveConjugate(std::vector<complex> new_data) {
       data[IDX_eps(i,j)] = new_data[n++];
     
   contribute(CkCallback(CkReductionTarget(Controller, conjugateComplete), controller_proxy));
+}
+
+void EpsMatrix::prep_diag(){
+  CkPrintf("\nDIAG data %d \n", CKMYPE());
+  diagData = new diagData_t();
 }
 
 void EpsMatrix::multiply_coulb(){

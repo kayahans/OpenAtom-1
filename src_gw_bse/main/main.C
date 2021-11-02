@@ -54,7 +54,6 @@
 /* readonly */ CProxy_PMatrix pmatrix1D_proxy;
 
 // Epsilon matrices (Phase 3 & 4)
-
 //==========================================================================
 //cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 //==========================================================================
@@ -151,6 +150,7 @@ Main::Main(CkMigrateMessage* msg) { }
 void Main::done() {
   CkExit();
 }
+
 
 void Main::StartHi(int elems){
 CkPrintf("\nBack to charm");

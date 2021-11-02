@@ -15,7 +15,7 @@ $(BUILDDIR):
 
 $(BUILDDIR)/libmodulemain.a: make_ci $(OBJS) $(DIRS)
 	$(CHARMC) $(LFLAGS) $(OBJS) $(BUILDDIR)/*.o -o $@
-	mv charmrun $(BUILDDIR)
+#	mv charmrun $(BUILDDIR)
 
 make_ci: $(MODULES)
 	for dir in $(DIRS); do make -C $${dir} make_ci; done
