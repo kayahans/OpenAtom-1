@@ -145,6 +145,21 @@ struct FComputePacket {
   std::vector<std::pair<int, int>>* regions;
 };
 
+class DiagBridge : public CBase_DiagBridge {
+  public:
+    int totaldata;
+    int row_size;
+    int col_size;
+    DiagBridge();
+    
+    void prepareData(int qindex, int size);
+    void sendToDiagonalizer();
+    void waitForQuiescence(int n);
+    void transferControlToMPI();
+    void receiveFromDiagonalizer();
+    void receiveData(int x, int y, std::vector<complex> data_in, int data_size, int rows, int cols);
+};
+
 class PsiCache : public CBase_PsiCache {
   public:
     PsiCache();
@@ -243,5 +258,6 @@ class FVectorCache : public CBase_FVectorCache {
 extern /* readonly */ CProxy_Controller controller_proxy;
 extern /* readonly */ CProxy_PsiCache psi_cache_proxy;
 extern /* readonly */ CProxy_FVectorCache fvector_cache_proxy;
+extern /* readonly */ CProxy_DiagBridge diag_bridge_proxy;
 
 #endif

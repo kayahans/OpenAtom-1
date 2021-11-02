@@ -12,10 +12,14 @@
 #include "fft_routines.h"
 #include "CkLoopAPI.h"
 #include "limits.h"
+#include "diagonalizer.h"
+
 #define eps_rows 20
 #define eps_cols 20
 
 void init_plan_lock();
+diagData_t* diagData;
+extern CProxy_DiagBridge diag_bridge_proxy;
 
 Controller::Controller() {
   GWBSE *gwbse = GWBSE::get();
@@ -219,6 +223,191 @@ void PsiCache::setQIndex(int q_index){
 
   total_time = 0.0;
   contribute(CkCallback(CkReductionTarget(Controller,psiCacheReady), controller_proxy));
+}
+
+DiagBridge::DiagBridge() {
+}
+
+void DiagBridge::prepareData(int qindex, int size) {
+  // setup the size of the pointed array before receiving data
+  // Block cyclic mapping
+  // size: rank of the matrix for an N x N invertable matrix size is N
+  // qindex: q index of the epsilon. Not really needed here, but used in debugging
+
+  int mype = CkMyPe();
+  
+  int remElems2 = size % eps_rows;  // square matrix
+  // Possible Charm++ tile sizes 
+  int stdElems = eps_rows * eps_rows;
+  int remElems = remElems2 * eps_rows;
+  int cornerElems = remElems2 * remElems2;
+
+  // Proc distribution to be used for diagonalization
+  GWBSE* gwbse = GWBSE::get();
+  int proc_rows = 2; // gwbse->gw_parallel.proc_rows;
+  int proc_cols = 2; // gwbse->gw_parallel.proc_cols;
+
+  // Epsilon matrix is tiled as numx by numy charm++ tiles
+  int numBlocks = size / eps_rows + 1;
+  int numx = numBlocks;
+  int numy = numx;
+
+  // CkPrintf("size %d eps_rows %d numx %d numy %d proc_rows %d proc_cols %d \n", size, eps_rows, numx, numy, proc_rows, proc_cols);
+  
+  // Reset data sizes each time this method is invoked
+  totaldata = 0; 
+  row_size = 0;
+  col_size = 0;
+
+  // These are used to count the number of charm++ tiles in a single diagData object
+  int x_prev = -1;
+  int y_prev = -1;
+  int x_num_tiles = 0;
+  int y_num_tiles = 0;
+
+  for (int x=0; x < numx; x++) {
+    for (int y=0; y < numy; y++) {
+      int dest_pe_row = x%proc_rows;
+      int dest_pe_col = y%proc_cols;
+      int dest_pe = dest_pe_row*proc_cols + dest_pe_col;
+
+      if (dest_pe == mype) {
+        if (x > x_prev) {
+          x_prev = x;
+          x_num_tiles += 1;
+        }
+        if (y > y_prev) {
+          y_prev = y;
+          y_num_tiles +=1;
+        }
+        bool borderX = false;
+        bool borderY = false;
+        if (x + 1 == numBlocks) {
+          borderX = true;
+        }
+
+        if (y + 1 == numBlocks) {
+          borderY = true;
+        }
+
+        int xy_datasize = 0;
+        int rows = 0;
+        int cols = 0;
+        if (borderX && !borderY) {
+          xy_datasize = remElems;
+          rows = remElems2;
+          cols = eps_rows;
+        } else if (!borderX && borderY) {
+          xy_datasize = remElems;
+          rows = eps_rows;
+          cols = remElems2;
+        } else if (borderX && borderY) {
+          xy_datasize = cornerElems;
+          rows = remElems2;
+          cols = remElems2;          
+        } else {
+          xy_datasize = stdElems;
+          rows = eps_rows;
+          cols = eps_rows;          
+        }
+
+        // CkPrintf("x %d y %d pe %d xydata %d rows %d cols %d\n", x, y, CkMyPe(), xy_datasize, rows, cols);
+        totaldata += xy_datasize;
+        row_size  += rows;
+        col_size  += cols;
+      } // end if
+    } // end for
+  } // end for
+
+  row_size = row_size / y_num_tiles;
+  col_size = col_size / x_num_tiles;
+
+  // Setup the pointer to be used in MPI
+  diagData = new diagData_t();
+  diagData->input = new double[totaldata];
+  diagData->inputsize = totaldata; // totaldata = row_size * col_size
+  diagData->row_size = row_size;
+  diagData->col_size = col_size;
+
+  diagData->eig_e = new double[size];
+  // diagData->eig_v = new double[size*size];  // Not sure which pe gets the final result
+  diagData->dim = size;
+  diagData->qindex = qindex;
+  diagData->nb = eps_rows;
+  diagData->n = numBlocks;
+  
+  diagData->nprow = proc_rows;
+  diagData->npcol = proc_cols;
+
+  CkPrintf("[DIAGONALIZER] Created a pointer with size %d at pe %d for epsilon qindex %d \n", totaldata, CkMyPe(), qindex);
+  // contribute(CkCallback(CkReductionTarget(Controller, diag_setup), controller_proxy));
+}
+
+void DiagBridge::receiveData(int x, int y, std::vector<complex> data_in, int data_size, int rows, int cols) {
+  // copy data into the correct place in your tile
+  int mype = CkMyPe();
+  GWBSE* gwbse = GWBSE::get();
+  int proc_rows = 2; //gwbse->gw_parallel.proc_rows;
+  int proc_cols = 2; //gwbse->gw_parallel.proc_cols;
+  // CkPrintf("pe %d x %d y %d size %d\n", CkMyPe(), x, y, data_size);
+  int x_blockC = x / proc_rows;
+  int y_blockC = y / proc_cols;
+  int start_row = x_blockC * eps_rows;
+  int start_col = y_blockC * eps_rows;
+  
+  int idx_row;
+  int idx_col;
+  int idx;
+  for (int r = 0; r < rows; r++) {
+    for (int c = 0; c < cols; c++) { 
+      idx_row = r + start_row;
+      idx_col = c + start_col;
+      idx = idx_row*diagData->col_size + idx_col; // True?
+      // CkPrintf("%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d \n",x, y, x_blockC, y_blockC, r, c, idx_row, idx_col, idx, data_size, rows, cols, diagData->col_size, diagData->row_size, diagData->qindex, diagData->inputsize);
+      diagData->input[idx] = data_in[r * rows + c].re;  // TODO fix to complex later
+    }
+  }
+  // CkPrintf("[DIAGBRIDGE] Eps chare (%d,%d) copied local (%d, %d)-(%d, %d) on PE [%d] \n",x, y, start_row, start_col, idx_row, idx_col, mype);
+  // contribute(CkCallback(CkReductionTarget(Controller, blockMapped), controller_proxy));
+}
+
+void DiagBridge::waitForQuiescence(int totalContribution) {
+  int mype = CKMYPE();
+  
+  CkPrintf("In waitForQuiescence: Total Contribution: <%d>, <%d>\n", totalContribution, mype);
+  CkCallback qdcb(CkIndex_DiagBridge::transferControlToMPI(), thisProxy[0]);
+  CkStartQD(qdcb);
+  // // mainProxy.done(); //
+}
+
+void DiagBridge::sendToDiagonalizer() {
+CkPrintf("[DIAGBRIDGE] Exiting to MPI pe = %d\n", CKMYPE());
+  // mainProxy.done();
+  int mype = CKMYPE();
+  // CkExit();
+  // mainProxy.done();
+  int myContribution = 1;
+  // CkCallback cb(CkReductionTarget(DiagBridge, waitForQuiescence), diag_bridge_proxy);
+  // contribute(sizeof(int), &myContribution, CkReduction::sum_int, cb);
+  diagData = new diagData_t();
+  contribute(CkCallback(CkReductionTarget(Controller, mpi_copy_complete), controller_proxy));
+}
+
+void DiagBridge::transferControlToMPI() {
+  int mype = CKMYPE();
+  CkPrintf("\n\nQuiescence Has Been Detected in Ortho <%d>\n\n", mype);
+  // mainProxy.done();
+  // CkExit();  
+}
+
+void DiagBridge::receiveFromDiagonalizer() {
+  // CkPrintf("[DIAGBRIDGE] COMPLETE pe = %d\n", CKMYPE());
+  delete[] diagData->eig_e;
+  delete[] diagData->eig_v;
+  delete[] diagData->input;
+  delete diagData;
+  CkPrintf("[MAIN] receive pe = %d\n", CKMYPE());
+  // contribute(CkCallback(CkReductionTarget(Controller, diag_complete), controller_proxy));
 }
 
 void PsiCache::reportFTime() {

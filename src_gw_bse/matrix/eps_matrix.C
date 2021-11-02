@@ -11,7 +11,7 @@
 
 #include <cstring> // for memcpy
 using std::memcpy;
-diagData_t* diagData;
+// diagData_t* diagData;
 
 #define eps_rows 20
 #define eps_cols 20
@@ -434,7 +434,7 @@ void EpsMatrix::receiveConjugate(std::vector<complex> new_data) {
 
 void EpsMatrix::prep_diag(){
   CkPrintf("\nDIAG data %d \n", CKMYPE());
-  diagData = new diagData_t();
+  // diagData = new diagData_t();
 }
 
 void EpsMatrix::multiply_coulb(){

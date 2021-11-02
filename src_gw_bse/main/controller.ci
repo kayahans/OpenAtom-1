@@ -55,6 +55,7 @@ module controller {
     entry [reductiontarget] void transposeComplete();
     entry [reductiontarget] void copyComplete(bool success);
     entry [reductiontarget] void transpose_complete();
+    entry [reductiontarget] void mpi_copy_complete();
     entry [reductiontarget] void copy_complete();
     entry [reductiontarget] void m_multiplied();
     entry [reductiontarget] void conjugateComplete();
@@ -672,7 +673,6 @@ module controller {
       }
       when found_alpha(double alpha) serial{
         eps_matrix2D_m_proxy.scalar_multiply(1/alpha);
-        eps_matrix2D_m_proxy.prep_diag();
       }
 
       // X = eps_matrix2D_proxy
@@ -765,10 +765,13 @@ module controller {
             thisProxy.transpose_complete();
         }
       } //end of for loop
-
       serial {
+        CkPrintf("[CONTROLLER] Transfer data to MPI\n");
+        diag_bridge_proxy.sendToDiagonalizer();
+      }
+      when mpi_copy_complete() serial {
         STOP_STEP("Iterative inverse completed");
-        STOP_BIG_STEP("EPSILON INVERTED");
+        STOP_BIG_STEP("EPSILON INVERTED");        
         mainProxy.done();
         
 //        thisProxy.EpsilonInverted();

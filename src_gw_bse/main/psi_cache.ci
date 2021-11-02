@@ -12,4 +12,14 @@ module psi_cache {
     entry void reportInfo();
   };
   
+  group DiagBridge{
+    entry DiagBridge();
+
+    entry [reductiontarget] void waitForQuiescence (int totalcents);
+    entry void transferControlToMPI();
+    entry void receiveFromDiagonalizer();
+    entry void sendToDiagonalizer();
+    entry void prepareData(int qindex, int size);
+    entry void receiveData(int x, int y, std::vector<complex> data_in, int data_size, int rows, int cols);
+  };  
 };
