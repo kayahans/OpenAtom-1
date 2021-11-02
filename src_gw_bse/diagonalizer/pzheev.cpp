@@ -7,11 +7,9 @@
 #include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
-//header files for libraries in Charm I wish to use with MPI
-#include "main/hi.h"
 //header file from Charm needed for Interoperation
 #include "mpi-interoperate.h"
-#include "diagonalizer/diagonalizer.h"
+#include "diagonalizer.h"
 using namespace std;
 
 extern "C" {
@@ -27,7 +25,7 @@ extern "C" {
   int numroc_(int *n, int *nb, int *iproc, int *isrcproc, int *nprocs);
   void descinit_(int *desc, int *m, int *n, int *mb, int *nb, int *irsrc, int *icsrc,
                  int *ictxt, int *lld, int *info);
-  void pdsyev_(char *jobz, char *uplo, int *n, double *a, int *ia, int *ja,
+  void pzheev_(char *jobz, char *uplo, int *n, double *a, int *ia, int *ja,
                  int *desca, double *w, double *z, int *iz, int *jz, int *descz,
                  double *work, int *lwork, int *info);
 }
@@ -110,10 +108,11 @@ int main(int argc, char **argv){
         Cblacs_get(0, 0, &ictxt);
         Cblacs_gridinit(&ictxt, "R", nprow, npcol);
         Cblacs_gridinfo(ictxt, &nprow, &npcol, &myrow, &mycol);
-        printf("[DIAGONALIZER] on proc %dx%d of %dx%d nb %d n %d iternum %d\n",myrow+1, mycol+1, nprow, npcol, nb, n, iternum);
+        int size = diagData->inputsize;
+        printf("[DIAGONALIZER] on proc %dx%d of %dx%d inputsize %d nb %d n %d iternum %d\n",myrow+1, mycol+1, nprow, npcol, size, nb, n, iternum);
 
         MPI_Barrier(MPI_COMM_WORLD);
-        StartHi(16);
+        restartCharm();
         MPI_Barrier(MPI_COMM_WORLD);
     }
     if(!peid)

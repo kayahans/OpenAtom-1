@@ -339,7 +339,7 @@ void DiagBridge::prepareData(int qindex, int size) {
   diagData->nprow = proc_rows;
   diagData->npcol = proc_cols;
 
-  CkPrintf("[DIAGONALIZER] Created a pointer with size %d at pe %d for epsilon qindex %d \n", totaldata, CkMyPe(), qindex);
+  CkPrintf("[DIAGONALIZER] Created a pointer with size %d at pe %d for epsilon qindex %d\n", totaldata, CkMyPe(), qindex);
   // contribute(CkCallback(CkReductionTarget(Controller, diag_setup), controller_proxy));
 }
 
@@ -381,15 +381,10 @@ void DiagBridge::waitForQuiescence(int totalContribution) {
 }
 
 void DiagBridge::sendToDiagonalizer() {
-CkPrintf("[DIAGBRIDGE] Exiting to MPI pe = %d\n", CKMYPE());
-  // mainProxy.done();
-  int mype = CKMYPE();
-  // CkExit();
-  // mainProxy.done();
-  int myContribution = 1;
-  // CkCallback cb(CkReductionTarget(DiagBridge, waitForQuiescence), diag_bridge_proxy);
-  // contribute(sizeof(int), &myContribution, CkReduction::sum_int, cb);
-  diagData = new diagData_t();
+  int pe = CKMYPE();
+  CkPrintf("[DIAGBRIDGE] Exiting to MPI pe = %d\n", pe);
+  // diagData = new diagData_t();
+  thisProxy[pe].prepareData(1, 137);
   contribute(CkCallback(CkReductionTarget(Controller, mpi_copy_complete), controller_proxy));
 }
 

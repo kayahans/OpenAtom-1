@@ -26,5 +26,5 @@ struct diagData_t {
   int nb = 16;
 };
 
-
+void restartCharm();
 #endif  // _diagonalizer_h_

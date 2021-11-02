@@ -15,7 +15,7 @@ mainmodule main {
   mainchare Main {
     entry Main(CkArgMsg* msg);
     entry void done();
-    entry void StartHi(int elems);
+    entry void restart_main();
   };
   group EpsMap : CkArrayMap {
     entry EpsMap(MatrixConfig cfg2D);

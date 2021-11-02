@@ -28,7 +28,7 @@
 #include "configure_gwbse.h"
 #include "states.h"
 #include "CkLoopAPI.h"
-#include "hi.h"
+#include "../diagonalizer/diagonalizer.h"
 #include "mpi-interoperate.h"
 
 // =========================================================================
@@ -154,15 +154,15 @@ void Main::done() {
 }
 
 
-void Main::StartHi(int elems){
-CkPrintf("\nBack to charm");
-controller_proxy.EpsilonInverted();
+void Main::restart_main(){
+    controller_proxy.EpsilonInverted();
 }
 
-void StartHi(int elems)
+void restartCharm()
 {
   if(CkMyPe() == 0) {
-    mainProxy.StartHi(elems);
+    CkPrintf("\nBack to charm\n");
+    mainProxy.restart_main();
   }
   StartCharmScheduler();
 }

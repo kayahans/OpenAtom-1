@@ -11,7 +11,7 @@ class Main : public CBase_Main {
   
   /// Entry Methods ///
   void done();
-  void StartHi(int elems);
+  void restart_main();
 };
 
 class EpsMap : public CkArrayMap {
