@@ -106,6 +106,7 @@ class Controller : public CBase_Controller {
     int global_inew, global_jnew;
     int max_local_inew;
     int padded_epsilon_size;
+    int real_epsilon_size;
     double prev_max;
     int *n_list, *np_list;
     std::vector<int> accept_result;
@@ -119,7 +120,7 @@ class Controller : public CBase_Controller {
     CLA_Matrix_interface matA, matB, matC;
     CLA_Matrix_interface matA2, matB2, matC2;
     CLA_Matrix_interface matA3, matB3, matC3;
-    CProxy_EpsMatrix eps_matrix1D_proxy;
+    CProxy_EpsMatrix eps_matrix1D_proxy, s_matrix1D_proxy;
     CProxy_EpsMatrix eps_matrix2D_m_proxy, eps_matrix2D_mT_proxy,
                      eps_matrix2D_X_proxy, eps_matrix2D_A_proxy,
                      eps_matrix2D_M1_proxy, eps_matrix2D_X1_proxy,

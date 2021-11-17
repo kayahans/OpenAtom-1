@@ -340,7 +340,7 @@ void DiagBridge::prepareData(int qindex, int size) {
   diagData->npcol = proc_cols;
 
   CkPrintf("[DIAGONALIZER] Created a pointer with size %d at pe %d for epsilon qindex %d\n", totaldata, CkMyPe(), qindex);
-  // contribute(CkCallback(CkReductionTarget(Controller, diag_setup), controller_proxy));
+  contribute(CkCallback(CkReductionTarget(Controller, diag_setup), controller_proxy));
 }
 
 void DiagBridge::receiveData(int x, int y, std::vector<complex> data_in, int data_size, int rows, int cols) {
@@ -367,8 +367,8 @@ void DiagBridge::receiveData(int x, int y, std::vector<complex> data_in, int dat
       diagData->input[idx] = data_in[r * rows + c].re;  // TODO fix to complex later
     }
   }
-  // CkPrintf("[DIAGBRIDGE] Eps chare (%d,%d) copied local (%d, %d)-(%d, %d) on PE [%d] \n",x, y, start_row, start_col, idx_row, idx_col, mype);
-  // contribute(CkCallback(CkReductionTarget(Controller, blockMapped), controller_proxy));
+  CkPrintf("[DIAGBRIDGE] Eps chare (%d,%d) copied local (%d, %d)-(%d, %d) on PE [%d] \n",x, y, start_row, start_col, idx_row, idx_col, mype);
+  contribute(CkCallback(CkReductionTarget(Controller, mpi_copy_complete), controller_proxy));
 }
 
 void DiagBridge::waitForQuiescence(int totalContribution) {
@@ -385,7 +385,7 @@ void DiagBridge::sendToDiagonalizer() {
   CkPrintf("[DIAGBRIDGE] Exiting to MPI pe = %d\n", pe);
   // diagData = new diagData_t();
   thisProxy[pe].prepareData(1, 137);
-  contribute(CkCallback(CkReductionTarget(Controller, mpi_copy_complete), controller_proxy));
+  // contribute(CkCallback(CkReductionTarget(Controller, mpi_copy_complete), controller_proxy));
 }
 
 void DiagBridge::transferControlToMPI() {

@@ -107,8 +107,10 @@ int main(int argc, char **argv){
       Cblacs_gridinit(&ictxt, "R", nprow, npcol);
       Cblacs_gridinfo(ictxt, &nprow, &npcol, &myrow, &mycol);
       int size = diagData->inputsize;
-      printf("[DIAGONALIZER] on proc %dx%d of %dx%d inputsize %d nb %d n %d iternum %d\n",myrow+1, mycol+1, nprow, npcol, size, nb, n, iternum);
-
+      // printf("[DIAGONALIZER] on proc %dx%d of %dx%d inputsize %d nb %d n %d iternum %d\n",myrow+1, mycol+1, nprow, npcol, size, nb, n, iternum);
+      for (int i=0; i < 10 ; i++) {
+        printf("[DIAGONALIZER] on proc %dx%d of %dx%d inputsize %d nb %d n %d iternum %d, %f\n",myrow+1, mycol+1, nprow, npcol, size, nb, n, iternum, diagData->input[i]);
+      }
       MPI_Barrier(MPI_COMM_WORLD);
       restartCharm();
       MPI_Barrier(MPI_COMM_WORLD);

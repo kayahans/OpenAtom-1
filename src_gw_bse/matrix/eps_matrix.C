@@ -68,6 +68,85 @@ void EpsMatrix::setI(CLA_Matrix_interface mat, bool clean){
   }
 }
 
+
+void EpsMatrix::copyToMPI(int qindex, int epsilon_size) {
+  
+  GWBSE* gwbse = GWBSE::get();
+  proc_rows = 2; // gwbse->gw_parallel.proc_rows;
+  proc_cols = 2; // gwbse->gw_parallel.proc_cols;
+  int dest_pe_row = thisIndex.x%proc_rows;
+  int dest_pe_col = thisIndex.y%proc_cols;
+  int dest_pe = dest_pe_row*proc_cols + dest_pe_col;
+
+
+  int x = thisIndex.x;
+  int y = thisIndex.y;
+
+  bool borderX = false;
+  bool borderY = false;
+
+  if (x + 1 == numBlocks) {
+    borderX = true;
+  }
+
+  if (y + 1 == numBlocks) {
+    borderY = true;
+  }
+
+  int dataSize = -1;
+
+  int remElems2 = epsilon_size % eps_rows;  // eps_rows = eps_col square matrix
+  int stdElems = eps_rows * eps_cols;
+  int remElems = remElems2 * eps_rows;
+  int cornerElems = remElems2 * remElems2;
+
+  int rows = 0;
+  int cols = 0;
+  if (borderX && !borderY) {
+    dataSize = remElems;
+    rows = remElems2;
+    cols = eps_rows;
+  } else if (!borderX && borderY) {
+    dataSize = remElems;
+    rows = eps_rows;
+    cols = remElems2;
+  } else if (borderX && borderY) {
+    dataSize = cornerElems;
+    rows = remElems2;
+    cols = remElems2;
+  } else {
+    dataSize = stdElems;
+    rows = eps_rows;
+    cols = eps_rows;
+  }
+  std::vector<complex> data_out(dataSize);
+
+  int idx_row = 0;
+  int idx_col = 0;
+  int i = 0;
+  for (int r = 0; r < eps_rows; r++) {
+    for (int c = 0; c < eps_cols; c++) {
+      idx_row = start_row + r;
+      idx_col = start_col + c;
+      if (idx_row < epsilon_size && idx_col < epsilon_size) {
+        data_out[i] = data[r*config.tile_cols + c].re;  // True?
+        i++;
+      }
+    }
+  }
+  // std::vector<complex> data_out(total_data);
+  // for(int i=0;i<total_data;i++)
+  //   data_out[i] = data[i];
+  // CkPrintf("qindex %d, eps_size %d \n", qindex, epsilon_size);
+  // CkPrintf("dest_pe %d thisIndex.x %d thisIndex.y %d rows %d cols %d total_data %d \n", dest_pe, thisIndex.x, thisIndex.y, ng, ng, dataSize);
+  CkPrintf("dest_pe %d thisIndex.x %d thisIndex.y %d total_data %d \n", dest_pe, thisIndex.x, thisIndex.y, dataSize);
+  // CkPrintf(" cols %d eps %d %d %d %d %d %d\n", config.tile_cols, eps_rows, blockSize, numBlocks, block, start_row, start_col);
+  // diag_bridge_proxy[dest_pe].prepareData();
+  CkPrintf("[DIAGBRIDGE] Eps chare (%d,%d) will copy global (%d, %d)-(%d, %d) on PE [%d]\n",x, y, start_row, start_col, idx_row, idx_col, CKMYPE());
+  diag_bridge_proxy[dest_pe].receiveData(x, y, data_out, dataSize, rows, cols);
+}
+
+
 void EpsMatrix::receiveFs(Phase3Message* msg) {
   int n = 0;
   // TODO: memcpy
@@ -454,7 +533,7 @@ void EpsMatrix::multiply_coulb(){
     }
   }
 
-  contribute(CkCallback(CkReductionTarget(Controller, s_gpp), controller_proxy));
+  contribute(CkCallback(CkReductionTarget(Controller, s_ready), controller_proxy));
 }
 
 #include "eps_matrix.def.h"

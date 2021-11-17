@@ -28,7 +28,8 @@ module eps_matrix {
     entry void prep_diag();
     entry void createCopy(CProxy_EpsMatrix other, bool todo);
     entry void recvCopy(std::vector<complex> new_data);
-
+    entry void copyToMPI(int qindex, int epsilon_size);
+    
     entry void pdgemmSendInput(CProxy_EpsMatrix output, bool aOrB) {
       serial {
         if (aOrB)

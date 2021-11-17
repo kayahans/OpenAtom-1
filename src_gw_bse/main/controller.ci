@@ -55,8 +55,9 @@ module controller {
     entry [reductiontarget] void transposeComplete();
     entry [reductiontarget] void copyComplete(bool success);
     entry [reductiontarget] void transpose_complete();
-    entry [reductiontarget] void mpi_copy_complete();
+    
     entry [reductiontarget] void copy_complete();
+    entry [reductiontarget] void s_ready();
     entry [reductiontarget] void m_multiplied();
     entry [reductiontarget] void conjugateComplete();
     entry [reductiontarget] void complement_multiplied();
@@ -69,13 +70,14 @@ module controller {
     entry [reductiontarget] void screenedExchangeComplete(CkReductionMsg* msg);
     entry [reductiontarget] void cohComplete(CkReductionMsg* msg);
     
-    entry [reductiontarget] void s_gpp();
-    // entry [reductiontarget] void diag_setup();
+    entry [reductiontarget] void diag_setup();
+    entry [reductiontarget] void mpi_copy_complete();
+    entry [reductiontarget] void gpp_complete();
     entry [reductiontarget] void readComplete(bool success);
     entry [reductiontarget] void writeComplete(bool success);
     entry [reductiontarget] void verifyComplete(bool success);
     entry void PMatrixFormed();
-    entry void s_ready();
+    
     entry void EpsilonFormed();
     entry void EpsilonInverted();
 
@@ -121,6 +123,7 @@ module controller {
                                 int epsilon_size) serial {
         accept_result = accept;
         PAD(epsilon_size);
+        real_epsilon_size = epsilon_size;
         fvector_cache_proxy.setDim(padded_epsilon_size/eps_rows,
                                     accept,geps_x,geps_y,geps_z);
         states_proxy.fftGtoR(qindex);
@@ -231,6 +234,9 @@ module controller {
 
         MatrixConfig cfg1D = convertTo1D(cfg2D, eps_rows);
         eps_matrix1D_proxy = CProxy_EpsMatrix::ckNew(
+            cfg1D, cfg1D.chareRows(), cfg1D.chareCols());
+        
+        s_matrix1D_proxy = CProxy_EpsMatrix::ckNew(
             cfg1D, cfg1D.chareRows(), cfg1D.chareCols());
 
         if (!eps_config.read) {
@@ -380,28 +386,30 @@ module controller {
       }
       when copy_complete() serial {
         s_matrix2D_proxy.multiply_coulb();
-        
       }
-//       serial {
-//         CkPrintf("[CONTROLLER] Transfer data to MPI\n");
-//         diag_bridge_proxy.sendToDiagonalizer();
-//       }
-//       when mpi_copy_complete() serial {
-//         STOP_STEP("Iterative inverse completed");
-//         STOP_BIG_STEP("EPSILON INVERTED");        
-//         mainProxy.done();
-        
-// //        thisProxy.EpsilonInverted();
-//       }
-      when s_gpp() serial {
+      // Print S-matrix to verify (start)
+      serial {
+        matrixCopy(s_matrix2D_proxy, s_matrix1D_proxy, copyCB);
+      }
+      when copyComplete(bool success) {}
+      serial {
+        matrixWrite(s_matrix1D_proxy, "data/Smatrix", writeCB);
+      }
+      // Print S-matrix to verify (end)
+
+      when s_ready() serial {
+        CkPrintf("[CONTROLLER] Prepare transferring data to MPI\n");
+        diag_bridge_proxy.prepareData(qindex, real_epsilon_size);
+      }
+      when diag_setup() serial {
         CkPrintf("[CONTROLLER] Transfer data to MPI\n");
-        diag_bridge_proxy.sendToDiagonalizer();
+        s_matrix2D_proxy.copyToMPI(qindex, real_epsilon_size);
       }
       when mpi_copy_complete() serial {
-        CkPrintf("Transfered to MPI\n");
+        CkPrintf("Transfer to MPI is complete\n");
         mainProxy.done();
       }
-      when s_ready() serial {
+      when gpp_complete() serial {
         CkPrintf("[CONTROLLER] Phase-4 Bare Exchange, Screen Exchange and COH computation\n");
         CkPrintf("| Type               | K | n | n' |     Sigma       \n");
         bare_x = screen_x = coh = (0.0,0.0);

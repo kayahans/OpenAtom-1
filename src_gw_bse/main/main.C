@@ -155,7 +155,7 @@ void Main::done() {
 
 
 void Main::restart_main(){
-    controller_proxy.s_ready();
+    controller_proxy.gpp_complete();
 }
 
 void restartCharm()
