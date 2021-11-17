@@ -454,7 +454,7 @@ void EpsMatrix::multiply_coulb(){
     }
   }
 
-  contribute(CkCallback(CkReductionTarget(Controller, s_ready), controller_proxy));
+  contribute(CkCallback(CkReductionTarget(Controller, s_gpp), controller_proxy));
 }
 
 #include "eps_matrix.def.h"

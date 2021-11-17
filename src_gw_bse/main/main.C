@@ -155,7 +155,7 @@ void Main::done() {
 
 
 void Main::restart_main(){
-    controller_proxy.EpsilonInverted();
+    controller_proxy.s_ready();
 }
 
 void restartCharm()

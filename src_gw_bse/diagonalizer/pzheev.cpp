@@ -44,16 +44,14 @@ int main(int argc, char **argv){
   printf("\nCalling MPI code\n");
 
   int peid, numpes;
-  
   MPI_Comm newComm;
-
   int iam, nprocs;
   int ictxt, nprow, npcol, myrow, mycol;
   int np, nq, nb, n;
   int mpA, nqA;
   int i, j, k, info, itemp, seed, lwork, min_mn;
   int descA[9], descZ[9];
-  // double *A, *Z, *work, *W;
+  double *A, *Z, *work, *W;
   int izero=0,ione=1;
   double mone=(-1.0e0),pone=(1.0e0),dzero=(0.0e0);
   double MPIt1, MPIt2, MPIelapsed;
@@ -87,33 +85,33 @@ int main(int argc, char **argv){
     int iternum = 1;
     
     for(; iternum <= total_iter ; iternum++) {
-        nprow   = diagData->nprow;
-        npcol   = diagData->npcol;
-        n       = diagData->n;
-        nb      = diagData->nb;
-        jobz    = 'V';
-        uplo    = 'U';
+      // printf("Handoff to MPI for diagonalization %d\n", CkMyPe());
+      nprow   =  diagData->nprow;
+      npcol   =  diagData->npcol;
+      n       =  diagData->n;
+      nb      =  diagData->nb;
+      jobz    = 'V';
+      uplo    = 'U';
+      if (nprow*npcol>numpes) {
+          if (peid==0) {
+          printf(" **** ERROR : we do not have enough processes available to make a p-by-q process grid ***\n");
+          }
+          printf("%d %d\n", nprow, npcol);
+          printf(" **** Bye-bye ***\n");
+          MPI_Finalize();
+          exit(1);
+      }        
+      
+      Cblacs_pinfo(&iam, &nprocs);
+      Cblacs_get(0, 0, &ictxt);
+      Cblacs_gridinit(&ictxt, "R", nprow, npcol);
+      Cblacs_gridinfo(ictxt, &nprow, &npcol, &myrow, &mycol);
+      int size = diagData->inputsize;
+      printf("[DIAGONALIZER] on proc %dx%d of %dx%d inputsize %d nb %d n %d iternum %d\n",myrow+1, mycol+1, nprow, npcol, size, nb, n, iternum);
 
-        if (nprow*npcol>numpes) {
-            if (peid==0) {
-            printf(" **** ERROR : we do not have enough processes available to make a p-by-q process grid ***\n");
-            }
-            printf("%d %d\n", nprow, npcol);
-            printf(" **** Bye-bye ***\n");
-            MPI_Finalize();
-            exit(1);
-        }        
-        // printf("Handoff to MPI for diagonalization %d\n", CkMyPe());
-        Cblacs_pinfo(&iam, &nprocs);
-        Cblacs_get(0, 0, &ictxt);
-        Cblacs_gridinit(&ictxt, "R", nprow, npcol);
-        Cblacs_gridinfo(ictxt, &nprow, &npcol, &myrow, &mycol);
-        int size = diagData->inputsize;
-        printf("[DIAGONALIZER] on proc %dx%d of %dx%d inputsize %d nb %d n %d iternum %d\n",myrow+1, mycol+1, nprow, npcol, size, nb, n, iternum);
-
-        MPI_Barrier(MPI_COMM_WORLD);
-        restartCharm();
-        MPI_Barrier(MPI_COMM_WORLD);
+      MPI_Barrier(MPI_COMM_WORLD);
+      restartCharm();
+      MPI_Barrier(MPI_COMM_WORLD);
     }
     if(!peid)
       printf("Invoke charmlib exit\n");

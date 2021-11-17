@@ -68,11 +68,14 @@ module controller {
     entry [reductiontarget] void bareExchangeComplete(CkReductionMsg* msg);
     entry [reductiontarget] void screenedExchangeComplete(CkReductionMsg* msg);
     entry [reductiontarget] void cohComplete(CkReductionMsg* msg);
-    entry [reductiontarget] void s_ready();
+    
+    entry [reductiontarget] void s_gpp();
+    // entry [reductiontarget] void diag_setup();
     entry [reductiontarget] void readComplete(bool success);
     entry [reductiontarget] void writeComplete(bool success);
     entry [reductiontarget] void verifyComplete(bool success);
     entry void PMatrixFormed();
+    entry void s_ready();
     entry void EpsilonFormed();
     entry void EpsilonInverted();
 
@@ -378,6 +381,25 @@ module controller {
       when copy_complete() serial {
         s_matrix2D_proxy.multiply_coulb();
         
+      }
+//       serial {
+//         CkPrintf("[CONTROLLER] Transfer data to MPI\n");
+//         diag_bridge_proxy.sendToDiagonalizer();
+//       }
+//       when mpi_copy_complete() serial {
+//         STOP_STEP("Iterative inverse completed");
+//         STOP_BIG_STEP("EPSILON INVERTED");        
+//         mainProxy.done();
+        
+// //        thisProxy.EpsilonInverted();
+//       }
+      when s_gpp() serial {
+        CkPrintf("[CONTROLLER] Transfer data to MPI\n");
+        diag_bridge_proxy.sendToDiagonalizer();
+      }
+      when mpi_copy_complete() serial {
+        CkPrintf("Transfered to MPI\n");
+        mainProxy.done();
       }
       when s_ready() serial {
         CkPrintf("[CONTROLLER] Phase-4 Bare Exchange, Screen Exchange and COH computation\n");
@@ -766,15 +788,9 @@ module controller {
         }
       } //end of for loop
       serial {
-        CkPrintf("[CONTROLLER] Transfer data to MPI\n");
-        diag_bridge_proxy.sendToDiagonalizer();
-      }
-      when mpi_copy_complete() serial {
         STOP_STEP("Iterative inverse completed");
-        STOP_BIG_STEP("EPSILON INVERTED");        
-        mainProxy.done();
-        
-//        thisProxy.EpsilonInverted();
+        STOP_BIG_STEP("EPSILON INVERTED");
+        thisProxy.EpsilonInverted();
       }
     }
   };

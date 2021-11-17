@@ -330,12 +330,12 @@ void DiagBridge::prepareData(int qindex, int size) {
   diagData->col_size = col_size;
 
   diagData->eig_e = new double[size];
-  // diagData->eig_v = new double[size*size];  // Not sure which pe gets the final result
+  diagData->eig_v = new double[size*size];  // Not sure which pe gets the final result
   diagData->dim = size;
   diagData->qindex = qindex;
   diagData->nb = eps_rows;
   diagData->n = numBlocks;
-  
+
   diagData->nprow = proc_rows;
   diagData->npcol = proc_cols;
 
