@@ -52,4 +52,21 @@ class Phase4Message : public CMessage_Phase3Message {
     complex* data;
     int n;
 };
+
+class DiagMessage : public CMessage_DiagMessage {
+  public:
+    DiagMessage(int s) : size(s) {
+      data = new double[size];
+    }
+    double* data;
+    int size;
+    int x;
+    int y;
+    int dest_pe_row;
+    int dest_pe_col;
+    int dest_pe;
+    int total_data;
+    int eps_source_pe;
+    int eps_source_pe2;
+};
 #endif

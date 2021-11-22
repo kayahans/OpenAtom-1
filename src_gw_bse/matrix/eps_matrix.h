@@ -49,7 +49,10 @@ class EpsMatrix : public CBase_EpsMatrix {
     void setI(CLA_Matrix_interface mat, bool clean);
     void receiveConvCheck(std::vector<complex> incoming);
     void copyToMPI(int qindex, int epsilon_size);
-
+    void sendDiagData(DiagMessage* msg);
+    void packMsg(DiagMessage* msg);
+    void all_copied(CkReductionMsg *msg);
+    
     static void done_cb(void *obj){
      ((EpsMatrix*) obj)->round_done();
     }

@@ -123,8 +123,7 @@ class Controller : public CBase_Controller {
     CProxy_EpsMatrix eps_matrix1D_proxy, s_matrix1D_proxy;
     CProxy_EpsMatrix eps_matrix2D_m_proxy, eps_matrix2D_mT_proxy,
                      eps_matrix2D_X_proxy, eps_matrix2D_A_proxy,
-                     eps_matrix2D_M1_proxy, eps_matrix2D_X1_proxy,
-                     s_matrix2D_proxy;
+                     eps_matrix2D_M1_proxy, eps_matrix2D_X1_proxy;
 };
 
 // A struct containing the required info for computing a set of f vectors for a
@@ -154,11 +153,15 @@ class DiagBridge : public CBase_DiagBridge {
     DiagBridge();
     
     void prepareData(int qindex, int size);
+    void copyFromMPI();
+    void print_simple();
+    void copyToMPI(int qindex, int real_epsilon_size);
     void sendToDiagonalizer();
     void waitForQuiescence(int n);
     void transferControlToMPI();
     void receiveFromDiagonalizer();
-    void receiveData(int x, int y, std::vector<complex> data_in, int data_size, int rows, int cols);
+    // void receiveData(int x, int y, std::vector<complex> data_in, int data_size, int rows, int cols, int dest_pe, int sending_pe);
+    void receiveDataSimple(DiagMessage* msg);
 };
 
 class PsiCache : public CBase_PsiCache {
@@ -260,5 +263,5 @@ extern /* readonly */ CProxy_Controller controller_proxy;
 extern /* readonly */ CProxy_PsiCache psi_cache_proxy;
 extern /* readonly */ CProxy_FVectorCache fvector_cache_proxy;
 extern /* readonly */ CProxy_DiagBridge diag_bridge_proxy;
-
+extern /* readonly */ CProxy_EpsMatrix s_matrix2D_proxy;
 #endif

@@ -1,5 +1,7 @@
 module psi_cache {
   extern module messages;
+  extern module eps_matrix;
+
   readonly CProxy_PsiCache psi_cache_proxy;
 
   nodegroup PsiCache {
@@ -19,7 +21,12 @@ module psi_cache {
     entry void transferControlToMPI();
     entry void receiveFromDiagonalizer();
     entry void sendToDiagonalizer();
+    entry void copyFromMPI();
+    entry void print_simple();
+    entry void copyToMPI(int qindex, int real_epsilon_size);
     entry void prepareData(int qindex, int size);
-    entry void receiveData(int x, int y, std::vector<complex> data_in, int data_size, int rows, int cols);
-  };  
+    // entry void receiveData(int x, int y, std::vector<complex> data_in, int data_size, int rows, int cols, int dest_pe, int sending_pe);
+    entry void receiveDataSimple(DiagMessage* msg);
+  };
+
 };

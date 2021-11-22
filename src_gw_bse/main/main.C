@@ -31,6 +31,7 @@
 #include "../diagonalizer/diagonalizer.h"
 #include "mpi-interoperate.h"
 
+
 // =========================================================================
 // states_occ_proxy is declared readonly in states.ci file that makes them parallel global.
 // This declaration in main where we instantiated makes them c++ global.
@@ -53,7 +54,7 @@
 // PMatrix Proxies (Phase 1 & 2)
 /* readonly */ CProxy_PMatrix pmatrix2D_proxy;
 /* readonly */ CProxy_PMatrix pmatrix1D_proxy;
-
+/* readonly */ CProxy_EpsMatrix s_matrix2D_proxy;
 // Epsilon matrices (Phase 3 & 4)
 //==========================================================================
 //cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
@@ -155,7 +156,7 @@ void Main::done() {
 
 
 void Main::restart_main(){
-    controller_proxy.gpp_complete();
+  controller_proxy.gpp_complete();
 }
 
 void restartCharm()
