@@ -151,11 +151,41 @@ class DiagBridge : public CBase_DiagBridge {
     int totaldata;
     int row_size;
     int col_size;
+    double* data;
+    int x;
+    int y;
+    int eps_pe;
+
 
     DiagBridge();
+    DiagBridge(int totaldata) : totaldata(totaldata) {
+      data = new double[totaldata];
+    }
 
+    void pup(PUP::er &p) {
+      p|totaldata;
+      p|row_size;
+      p|col_size;
+      p|x;
+      p|y;
+      p|eps_pe;
+      if (p.isUnpacking())
+        data = new double[totaldata];
+      PUParray(p, data, totaldata);
+    }
     void prepareData(int qindex, int size);
     void receiveDataSimple(DiagMessage* msg);
+    void receiveHeapSimple(const DiagBridge &inData) {
+      totaldata = inData.totaldata;
+      data = new double[inData.totaldata];
+      for (int i = 0; i < totaldata; i++) {
+        data[i] = inData.data[i];
+        if (i < 5) {
+          CkPrintf("[DIAGBRIDGE] x %d y %d eps_pe %d diag_pe %d i %d value %.6e\n",
+            inData.x, inData.y, inData.eps_pe, CkMyPe(), i, data[i]);
+        }
+      }
+    }
 };
 
 class PsiCache : public CBase_PsiCache {

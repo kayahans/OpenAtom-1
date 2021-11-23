@@ -76,22 +76,28 @@ module eps_matrix {
 
         CkPrintf("tile: x %d y %d   dest_pe %d curr_pe %d \n", thisIndex.x, thisIndex.y, eps_dest_pe, CkMyPe());
         
-        DiagMessage* msg; 
-        msg = new DiagMessage(dataSize);
-        msg->dest_pe = eps_dest_pe;
-        msg->x = thisIndex.x;
-        msg->y = thisIndex.y;
+        // DiagMessage* msg; 
+        // msg = new DiagMessage(dataSize);
+        // msg->dest_pe = eps_dest_pe;
+        // msg->x = thisIndex.x;
+        // msg->y = thisIndex.y;
         int i = 0;
         int idx_row, idx_col;
+        DiagBridge db(dataSize);
+        db.x = thisIndex.x;
+        db.y = thisIndex.y;
+        db.eps_pe = CkMyPe();
         for (int r = 0; r < eps_rows; r++) {
           for (int c = 0; c < eps_cols; c++) {
             idx_row = start_row + r;
             idx_col = start_col + c;
-            msg->data[i] = data[r*config.tile_cols + c].re;
+            db.data[i] = data[r*config.tile_cols + c].re;
+            // msg->data[i] = data[r*config.tile_cols + c].re;
             i++;
           }
         }
-        diag_proxy[eps_dest_pe].receiveDataSimple(msg);
+        // diag_proxy[eps_dest_pe].receiveDataSimple(msg);
+        diag_proxy[eps_dest_pe].receiveHeapSimple(db);
       }
     };
 

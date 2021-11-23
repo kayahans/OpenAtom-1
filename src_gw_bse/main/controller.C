@@ -362,6 +362,7 @@ void DiagBridge::receiveDataSimple(DiagMessage* msg) {
   } else {
     printf("pe_diag %d not reached at %d \n", dest_pe, CKMYPE());
   }
+  delete[] msg->data;
   delete msg;
   
 }
