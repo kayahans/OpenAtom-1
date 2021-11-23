@@ -43,16 +43,10 @@ class EpsMatrix : public CBase_EpsMatrix {
     void convergence_check(CProxy_EpsMatrix cmp_proxy);
     void add_compl_two();
     void multiply_coulb();
-    void prep_diag();
     void createCopy(CProxy_EpsMatrix other, bool todo);
     void recvCopy(std::vector<complex> new_data);
     void setI(CLA_Matrix_interface mat, bool clean);
     void receiveConvCheck(std::vector<complex> incoming);
-    void copyToMPI(int qindex, int epsilon_size);
-    void sendDiagData(DiagMessage* msg);
-    void packMsg(DiagMessage* msg);
-    void all_copied(CkReductionMsg *msg);
-    
     static void done_cb(void *obj){
      ((EpsMatrix*) obj)->round_done();
     }

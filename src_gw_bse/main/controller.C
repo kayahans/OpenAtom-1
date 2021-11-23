@@ -140,7 +140,6 @@ void Controller::got_vcoulb(std::vector<double> vcoulb_in, double vcoulb0){
   psi_cache_proxy.setVCoulb(vcoulb_in, vcoulb0);
 }
 
-
 PsiCache::PsiCache() {
   GWBSE *gwbse = GWBSE::get();
   K = gwbse->gw_parallel.K;
@@ -324,69 +323,31 @@ void DiagBridge::prepareData(int qindex, int size) {
   col_size = col_size / x_num_tiles;
 
   // Setup the pointer to be used in MPI
-  diagData = new diagData_t();
-  diagData->input = new double[totaldata];
-  diagData->inputsize = totaldata; // totaldata = row_size * col_size
-  diagData->row_size = row_size;
-  diagData->col_size = col_size;
+  diagData = new diagData_t[4];
+  diagData[0].input = new double[totaldata];
+  // diagData->inputsize = totaldata; // totaldata = row_size * col_size
+  // diagData->row_size = row_size;
+  // diagData->col_size = col_size;
 
-  diagData->eig_e = new double[size];
-  diagData->eig_v = new double[size*size];  // Not sure which pe gets the final result
-  diagData->dim = size;
-  diagData->qindex = qindex;
-  diagData->nb = eps_rows;
-  diagData->n = size;
+  // diagData->eig_e = new double[size];
+  // diagData->eig_v = new double[size*size];  // Not sure which pe gets the final result
+  // diagData->dim = size;
+  // diagData->qindex = qindex;
+  // diagData->nb = eps_rows;
+  // diagData->n = size;
 
-  diagData->nprow = proc_rows;
-  diagData->npcol = proc_cols;
+  // diagData->nprow = proc_rows;
+  // diagData->npcol = proc_cols;
   CkPrintf("[DIAGONALIZER] Created a pointer with size %d at pe %d for epsilon qindex %d\n", totaldata, CkMyPe(), qindex);
   contribute(CkCallback(CkReductionTarget(Controller, diag_setup), controller_proxy));
 }
-
-// void DiagBridge::receiveData(int x, int y, std::vector<complex> data_in, int data_size, 
-// int rows, int cols, int dest_pe, int receiving_pe) {
-//   // copy data into the correct place in your tile
-//   int mype = CkMyPe();
-//   CkPrintf("[DIAGBRIDGE2] %d from PE [%d] on PE[%d]\n", dest_pe, receiving_pe, mype);
-//   // CProxySection_DiagBridge sec_diag_proxy;
-//   // CkVec<int> elems = {dest_pe};
-//   // sec_diag_proxy = CProxySection_DiagBridge(diag_bridge_proxy.ckGetGroupID(), elems.getVec(), elems.size(), 1);
-
-//   if (mype == dest_pe) {
-//     GWBSE* gwbse = GWBSE::get();
-//     int proc_rows = 2; //gwbse->gw_parallel.proc_rows;
-//     int proc_cols = 2; //gwbse->gw_parallel.proc_cols;
-//     // CkPrintf("pe %d x %d y %d size %d\n", CkMyPe(), x, y, data_size);
-//     int x_blockC = x / proc_rows;
-//     int y_blockC = y / proc_cols;
-//     int start_row = x_blockC * eps_rows;
-//     int start_col = y_blockC * eps_rows;
-    
-//     int idx_row;
-//     int idx_col;
-//     int idx;
-//     for (int r = 0; r < rows; r++) {
-//       for (int c = 0; c < cols; c++) { 
-//         idx_row = r + start_row;
-//         idx_col = c + start_col;
-//         idx = idx_row*diagData->col_size + idx_col; // True?
-//         // CkPrintf("%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d \n",x, y, x_blockC, y_blockC, r, c, idx_row, idx_col, idx, data_size, rows, cols, diagData->col_size, diagData->row_size, diagData->qindex, diagData->inputsize);
-//         diagData->input[idx] = data_in[r * rows + c].re;  // TODO fix to complex later
-//       }
-//     }
-//     CkPrintf("[DIAGBRIDGE] chare (%d,%d) copied "
-//       "local (%d, %d)-(%d, %d) from PE [%d] on PE[%d]\n",
-//       x, y, start_row, start_col, idx_row, idx_col, receiving_pe, mype);
-//   } else {
-//     CkPrintf("[DIAGBRIDGE] ks\n");
-//     thisProxy[dest_pe].receiveData(x, y, data_in, data_size, rows, cols, dest_pe, receiving_pe);
-//   }
-// }
 
 void DiagBridge::receiveDataSimple(DiagMessage* msg) {
   // copy data into the correct place in your tile
   int mype = CkMyPe();
   int dest_pe = msg->dest_pe;
+  int x = msg->x;
+  int y = msg->y;
   // int eps_source_pe  = msg->eps_source_pe;
   // int eps_source_pe2  = msg->eps_source_pe2;
   // int eps_dest_pe  = msg->dest_pe;
@@ -395,98 +356,14 @@ void DiagBridge::receiveDataSimple(DiagMessage* msg) {
   // int loc_row = msg->dest_pe_row;
   // int loc_col= msg->dest_pe_col;
   if (dest_pe == mype) {
-    for (int i = 0; i < 20; i++) {
-      printf("[DIAGBRIDGE2] pe_diag %d i %d val %.6e\n", CKMYPE(), i, msg->data[i]);
+    for (int i = 0; i < 1; i++) {
+      CkPrintf("[DIAGBRIDGE2] eps tile: x %d y %d    pe_diag %d i %d value %.6e\n", x, y, CKMYPE(), i, msg->data[i]);
     }
   } else {
-    printf("dest pe %d not reachedat %d \n", dest_pe, CKMYPE());
-    // DiagMessage* msg2;
-    // msg2 = new DiagMessage(400);
-    thisProxy[0].print_simple();
+    printf("pe_diag %d not reached at %d \n", dest_pe, CKMYPE());
   }
+  delete msg;
   
-}
-
-void DiagBridge::print_simple() {
-  printf("PE %d reached\n", CKMYPE());
-}
-
-void DiagBridge::copyFromMPI() {
-  if (CKMYPE() == 0) {
-    for (int i = 0; i < 137; i++) {
-      printf("[CHARM++] eig_e %d %f \n", i, diagData->eig_e[i]*1000000);
-    }
-  }
-}
-
-void DiagBridge::copyToMPI(int qindex, int real_epsilon_size ) {
-  int proc_rows = 2; // gwbse->gw_parallel.proc_rows;
-  int proc_cols = 2; // gwbse->gw_parallel.proc_cols;
-  
-  int mype = CKMYPE();
-  int epsilon_size = real_epsilon_size;
-  int numBlocks = 7;
-
-
-  // std::vector<CkArrayIndex2D> elems;
-  for (int x=0; x < numBlocks; x++) {
-    for (int y=0; y < numBlocks; y++) {
-      int dest_pe_row = x%proc_rows;
-      int dest_pe_col = y%proc_cols;
-      int eps_dest_pe = dest_pe_row*proc_cols + dest_pe_col;
-      if (eps_dest_pe == mype) {
-        printf("[DIAGBRIDGE] EPS %d %d to db %d\n", x, y, mype);
-        DiagMessage* msg;
-        int size = 400;
-        msg = new DiagMessage(size);
-        s_matrix2D_proxy(x,y).sendDiagData(msg);
-      }
-    }
-  }
-  // int bfactor = 4;
-  // CProxySection_EpsMatrix secProxy = CProxySection_EpsMatrix::ckNew(s_matrix2D_proxy.ckGetArrayID(), elems.getVec(), elems.size(), bfactor);
-  // CkMulticastMgr *mCastGrp = CProxy_CkMulticastMgr(mCastGrpId).ckLocalBranch();
-  // secProxy.ckSectionDelegate(mCastGrp);
-  // sectionBcastMsg *msg = new sectionBcastMsg(1);
-  // secProxy.recvMsg(msg);
-
-}
-
-
-
-void DiagBridge::waitForQuiescence(int totalContribution) {
-  int mype = CKMYPE();
-  
-  CkPrintf("In waitForQuiescence: Total Contribution: <%d>, <%d>\n", totalContribution, mype);
-  CkCallback qdcb(CkIndex_DiagBridge::transferControlToMPI(), thisProxy[0]);
-  CkStartQD(qdcb);
-  // // mainProxy.done(); //
-}
-
-void DiagBridge::sendToDiagonalizer() {
-  int pe = CKMYPE();
-  CkPrintf("[DIAGBRIDGE] Exiting to MPI pe = %d\n", pe);
-  // diagData = new diagData_t();
-  // thisProxy[pe].prepareData(1, 137);
-  thisProxy[pe].print_simple();
-  // contribute(CkCallback(CkReductionTarget(Controller, mpi_copy_complete), controller_proxy));
-}
-
-void DiagBridge::transferControlToMPI() {
-  int mype = CKMYPE();
-  CkPrintf("\n\nQuiescence Has Been Detected in Ortho <%d>\n\n", mype);
-  // mainProxy.done();
-  // CkExit();  
-}
-
-void DiagBridge::receiveFromDiagonalizer() {
-  // CkPrintf("[DIAGBRIDGE] COMPLETE pe = %d\n", CKMYPE());
-  delete[] diagData->eig_e;
-  delete[] diagData->eig_v;
-  delete[] diagData->input;
-  delete diagData;
-  CkPrintf("[MAIN] receive pe = %d\n", CKMYPE());
-  // contribute(CkCallback(CkReductionTarget(Controller, diag_complete), controller_proxy));
 }
 
 

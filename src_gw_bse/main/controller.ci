@@ -55,7 +55,6 @@ module controller {
     entry [reductiontarget] void transposeComplete();
     entry [reductiontarget] void copyComplete(bool success);
     entry [reductiontarget] void transpose_complete();
-    
     entry [reductiontarget] void copy_complete();
     entry [reductiontarget] void s_ready();
     entry [reductiontarget] void m_multiplied();
@@ -69,7 +68,6 @@ module controller {
     entry [reductiontarget] void bareExchangeComplete(CkReductionMsg* msg);
     entry [reductiontarget] void screenedExchangeComplete(CkReductionMsg* msg);
     entry [reductiontarget] void cohComplete(CkReductionMsg* msg);
-    
     entry [reductiontarget] void diag_setup();
     entry [reductiontarget] void mpi_copy_complete();
     entry [reductiontarget] void gpp_complete();
@@ -77,7 +75,6 @@ module controller {
     entry [reductiontarget] void writeComplete(bool success);
     entry [reductiontarget] void verifyComplete(bool success);
     entry void PMatrixFormed();
-    
     entry void EpsilonFormed();
     entry void EpsilonInverted();
 
@@ -403,8 +400,7 @@ module controller {
       }
       when diag_setup() serial {
         CkPrintf("[CONTROLLER] Transfer data to MPI\n");
-        diag_bridge_proxy.copyToMPI(qindex, real_epsilon_size);
-        // s_matrix2D_proxy.copyToMPI(qindex, real_epsilon_size);
+        s_matrix2D_proxy.copyToMPI(qindex, real_epsilon_size, diag_bridge_proxy);
       }
       when mpi_copy_complete() serial {
         CkPrintf("Transfer to MPI is complete\n");
@@ -414,7 +410,7 @@ module controller {
         CkPrintf("[CONTROLLER] Phase-4 Bare Exchange, Screen Exchange and COH computation\n");
         CkPrintf("| Type               | K | n | n' |     Sigma       \n");
         bare_x = screen_x = coh = (0.0,0.0);
-        diag_bridge_proxy.copyFromMPI();
+        s_matrix2D_proxy.copyFromMPI(qindex, real_epsilon_size, diag_bridge_proxy);
       }
 
       for (next_K = 0; next_K < K; next_K++) {

@@ -146,21 +146,15 @@ struct FComputePacket {
 };
 
 class DiagBridge : public CBase_DiagBridge {
+  DiagBridge_SDAG_CODE
   public:
     int totaldata;
     int row_size;
     int col_size;
+
     DiagBridge();
-    
+
     void prepareData(int qindex, int size);
-    void copyFromMPI();
-    void print_simple();
-    void copyToMPI(int qindex, int real_epsilon_size);
-    void sendToDiagonalizer();
-    void waitForQuiescence(int n);
-    void transferControlToMPI();
-    void receiveFromDiagonalizer();
-    // void receiveData(int x, int y, std::vector<complex> data_in, int data_size, int rows, int cols, int dest_pe, int sending_pe);
     void receiveDataSimple(DiagMessage* msg);
 };
 

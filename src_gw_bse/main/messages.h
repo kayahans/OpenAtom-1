@@ -3,7 +3,7 @@
 
 #include <cstdlib>
 #include "ckcomplex.h"
-
+#include "diagonalizer.h"
 #include "messages.decl.h"
 
 // Message sent from psi used to compute f. Some of these are cached on each
