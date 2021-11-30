@@ -151,6 +151,7 @@ class DiagBridge : public CBase_DiagBridge {
     int totaldata;
     int row_size;
     int col_size;
+    int total_transfers = 49;
     double* data;
     int x;
     int y;
@@ -175,17 +176,20 @@ class DiagBridge : public CBase_DiagBridge {
     }
     void prepareData(int qindex, int size);
     void receiveDataSimple(DiagMessage* msg);
-    void receiveHeapSimple(const DiagBridge &inData) {
-      totaldata = inData.totaldata;
-      data = new double[inData.totaldata];
-      for (int i = 0; i < totaldata; i++) {
-        data[i] = inData.data[i];
-        if (i < 5) {
+    int receiveHeapSimple(const DiagBridge &inData) {
+      // totaldata = inData.totaldata;
+      // data = new double[inData.totaldata];
+      int mype = CkMyPe();
+      for (int i = 0; i < 1; i++) {
+        // data[i] = inData.data[i];
+        if (i < 1) {
           CkPrintf("[DIAGBRIDGE] x %d y %d eps_pe %d diag_pe %d i %d value %.6e\n",
-            inData.x, inData.y, inData.eps_pe, CkMyPe(), i, data[i]);
+            inData.x, inData.y, inData.eps_pe, mype, i, inData.data[i]);
         }
       }
+    return mype;
     }
+    
 };
 
 class PsiCache : public CBase_PsiCache {

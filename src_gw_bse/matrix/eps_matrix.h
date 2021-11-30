@@ -47,6 +47,7 @@ class EpsMatrix : public CBase_EpsMatrix {
     void recvCopy(std::vector<complex> new_data);
     void setI(CLA_Matrix_interface mat, bool clean);
     void receiveConvCheck(std::vector<complex> incoming);
+    int copyToMPI(int qindex, int epsilon_size, CProxy_DiagBridge diag_proxy);
     static void done_cb(void *obj){
      ((EpsMatrix*) obj)->round_done();
     }

@@ -114,6 +114,75 @@ void EpsMatrix::scalar_multiply(double alpha) {
   contribute(cb);
 }
 
+int EpsMatrix::copyToMPI(int qindex, int epsilon_size, CProxy_DiagBridge diag_proxy) {
+  int dest_pe_row = thisIndex.x%2;
+  int dest_pe_col = thisIndex.y%2;
+  int eps_dest_pe = dest_pe_row*2 + dest_pe_col;
+
+  bool borderX = false;
+  bool borderY = false;
+  
+  if (thisIndex.x + 1 == numBlocks) {
+    borderX = true;
+  }
+
+  if (thisIndex.y + 1 == numBlocks) {
+    borderY = true;
+  }
+
+  int dataSize = -1;
+
+  int remElems2 = epsilon_size % eps_rows;  // eps_rows = eps_col square matrix
+  int stdElems = eps_rows * eps_cols;
+  int remElems = remElems2 * eps_rows;
+  int cornerElems = remElems2 * remElems2;
+
+  int rows = 0;
+  int cols = 0;
+  if (borderX && !borderY) {
+    dataSize = remElems;
+    rows = remElems2;
+    cols = eps_rows;
+  } else if (!borderX && borderY) {
+    dataSize = remElems;
+    rows = eps_rows;
+    cols = remElems2;
+  } else if (borderX && borderY) {
+    dataSize = cornerElems;
+    rows = remElems2;
+    cols = remElems2;
+  } else {
+    dataSize = stdElems;
+    rows = eps_rows;
+    cols = eps_rows;
+  }
+
+  CkPrintf("tile: x %d y %d   dest_pe %d curr_pe %d \n", thisIndex.x, thisIndex.y, eps_dest_pe, CkMyPe());
+  
+  // DiagMessage* msg; 
+  // msg = new DiagMessage(dataSize);
+  // msg->dest_pe = eps_dest_pe;
+  // msg->x = thisIndex.x;
+  // msg->y = thisIndex.y;
+  int i = 0;
+  int idx_row, idx_col;
+  DiagBridge db(dataSize);
+  db.x = thisIndex.x;
+  db.y = thisIndex.y;
+  db.eps_pe = CkMyPe();
+  for (int r = 0; r < eps_rows; r++) {
+    for (int c = 0; c < eps_cols; c++) {
+      idx_row = start_row + r;
+      idx_col = start_col + c;
+      db.data[i] = data[r*config.tile_cols + c].re;
+      // msg->data[i] = data[r*config.tile_cols + c].re;
+      i++;
+    }
+  }
+  // diag_proxy[eps_dest_pe].receiveDataSimple(msg);
+  int val = diag_proxy[eps_dest_pe].receiveHeapSimple(db);
+  return 0;
+}
 void EpsMatrix::screenedExchange() {
 
   FVectorCache* f_cache = fvector_cache_proxy.ckLocalBranch();

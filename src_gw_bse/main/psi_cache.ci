@@ -16,7 +16,7 @@ module psi_cache {
     entry DiagBridge();
     entry void prepareData(int qindex, int size);
     entry void receiveDataSimple(DiagMessage* msg);
-    entry void receiveHeapSimple(DiagBridge &inData);
+    entry [sync] int receiveHeapSimple(DiagBridge &inData);
   };
 
 
