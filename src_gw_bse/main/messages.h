@@ -58,6 +58,7 @@ class DiagMessage : public CMessage_DiagMessage {
     DiagMessage(int s) : size(s) {
       data = new double[size];
     }
+    DiagMessage() {};
     double* data;
     int size;
     int x;

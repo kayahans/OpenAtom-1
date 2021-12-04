@@ -26,11 +26,14 @@ module eps_matrix {
     entry void coh();
     entry void findAlpha();
     entry void multiply_coulb();
+    entry [reductiontarget] void done(int result);
     entry void createCopy(CProxy_EpsMatrix other, bool todo);
     entry void recvCopy(std::vector<complex> new_data);
-    entry void copyFromMPI(int qindex, int epsilon_size, CProxy_DiagBridge diag_proxy) {
-    };
-    entry [sync] int copyToMPI(int qindex, int epsilon_size, CProxy_DiagBridge diag_proxy);
+    entry [sync] DiagMessage* receiveDataSimple();
+    entry void receiveHeapSimple();
+    // entry void copyFromMPI(int qindex, int epsilon_size, CProxy_DiagBridge diag_proxy) {
+    // };
+    // entry void copyToMPI(int qindex, int epsilon_size, CProxy_DiagBridge diag_proxy);
 
     entry void pdgemmSendInput(CProxy_EpsMatrix output, bool aOrB) {
       serial {
@@ -80,4 +83,71 @@ module eps_matrix {
     entry void inputA(int blockIdA, complex blockA[M*KA], unsigned int M, unsigned int KA, int a_index_x, int a_index_y);
     entry void inputB(int blockIdB, complex blockB[KB*N], unsigned int KB, unsigned int N, int b_index_x, int b_index_y);
   };
+  // end array EpsMatrix
+
+  group DiagBridge{
+    entry DiagBridge();
+    entry void prepareData(int qindex, int size);
+    entry void copyToDMPI(int qindex, int real_epsilon_size, CProxy_EpsMatrix smatrix_proxy) {
+      serial {
+        int mype = CkMyPe();
+        int numBlocks = 7;
+        // int eps_rows = 20;
+        // int eps_cols = 20;
+        for (int mat_x = 0; mat_x < numBlocks; mat_x++) {
+          for (int mat_y = 0; mat_y < numBlocks; mat_y++) { 
+            int dest_pe_row = mat_x%2;
+            int dest_pe_col = mat_y%2;
+            int dest_pe = dest_pe_row*2 + dest_pe_col;
+            
+            if (mype == dest_pe) {
+              bool borderX = false;
+              bool borderY = false;  
+
+              if (mat_x + 1 == numBlocks) {
+                borderX = true;
+              }
+              if (mat_y + 1 == numBlocks) {
+                borderY = true;
+              }
+              int dataSize = -1;
+              int remElems2 = real_epsilon_size % eps_rows;  // eps_rows = eps_col square matrix
+              int stdElems = eps_rows * eps_cols;
+              int remElems = remElems2 * eps_rows;
+              int cornerElems = remElems2 * remElems2;
+
+              int rows = 0;
+              int cols = 0;
+              if (borderX && !borderY) {
+                dataSize = remElems;
+                rows = remElems2;
+                cols = eps_rows;
+              } else if (!borderX && borderY) {
+                dataSize = remElems;
+                rows = eps_rows;
+                cols = remElems2;
+              } else if (borderX && borderY) {
+                dataSize = cornerElems;
+                rows = remElems2;
+                cols = remElems2;
+              } else {
+                dataSize = stdElems;
+                rows = eps_rows;
+                cols = eps_rows;
+              }
+              CkPrintf("[copyToDMPI] x %d y %d curr_pe %d size %d rows %d columns %d\n", mat_x, mat_y, CkMyPe(), dataSize, rows, cols);
+              DiagMessage* msg; 
+              msg = smatrix_proxy(mat_x, mat_y).receiveDataSimple();
+              CkPrintf("[returnToDMPI] x %d y %d pe %d\n", msg->x, msg->y, msg->dest_pe);
+              // delete msg;
+            }
+          }
+        }
+      }
+    }
+  };
+  // end group DiagBridge
+
+
+
 };

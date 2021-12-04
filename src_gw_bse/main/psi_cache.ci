@@ -11,14 +11,5 @@ module psi_cache {
     entry void setQIndex(int qindex);
     entry void reportInfo();
   };
-  
-  group DiagBridge{
-    entry DiagBridge();
-    entry void prepareData(int qindex, int size);
-    entry void receiveDataSimple(DiagMessage* msg);
-    entry [sync] int receiveHeapSimple(DiagBridge &inData);
-  };
-
-
 
 };

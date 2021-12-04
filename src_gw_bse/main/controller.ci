@@ -400,12 +400,8 @@ module controller {
       }
       when diag_setup() serial {
         CkPrintf("[CONTROLLER] Transfer data to MPI\n");
-        for (int i = 0; i < 7; i++) {
-          for (int j = 0; j < 7; j++) {
-            int val = s_matrix2D_proxy(i, j).copyToMPI(qindex, real_epsilon_size, diag_bridge_proxy);
-          }
-        }
-        
+        diag_bridge_proxy.copyToDMPI(qindex, real_epsilon_size, s_matrix2D_proxy);
+        // s_matrix2D_proxy.copyToMPI(qindex, real_epsilon_size, diag_bridge_proxy);
       }
       when mpi_copy_complete() serial {
         CkPrintf("Transfer to MPI is complete\n");
@@ -415,7 +411,7 @@ module controller {
         CkPrintf("[CONTROLLER] Phase-4 Bare Exchange, Screen Exchange and COH computation\n");
         CkPrintf("| Type               | K | n | n' |     Sigma       \n");
         bare_x = screen_x = coh = (0.0,0.0);
-        s_matrix2D_proxy.copyFromMPI(qindex, real_epsilon_size, diag_bridge_proxy);
+        // s_matrix2D_proxy.copyFromMPI(qindex, real_epsilon_size, diag_bridge_proxy);
       }
 
       for (next_K = 0; next_K < K; next_K++) {
