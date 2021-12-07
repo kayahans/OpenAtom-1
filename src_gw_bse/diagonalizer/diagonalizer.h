@@ -3,7 +3,7 @@
 // #include "diagonalizer.decl.h"
 
 struct diagData_t {
-  // int dim;  // dim x dim matrix
+  // TODO(kayahans) some inputs like num_handoff should be read from input file
   int qindex;
 
   int num_handoff = 8;  // Number of diagonalizations to be performed
@@ -12,11 +12,6 @@ struct diagData_t {
   double* eig_v;  // Eigenvectors (dim x dim)
   double* eig_e;  // Eigenvalues (dim x 1)
 
-
-  // int numStateddsOA;
-  // int grainSizeOrtho;
-  // int numEOrthosPerDim = 1;
-  // int numOrthosPerDim = 1;
   int inputsize = 0;
   int row_size = 0;
   int col_size = 0;

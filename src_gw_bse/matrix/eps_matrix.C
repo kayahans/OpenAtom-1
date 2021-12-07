@@ -114,78 +114,6 @@ void EpsMatrix::scalar_multiply(double alpha) {
   contribute(cb);
 }
 
-// void EpsMatrix::copyToMPI(int qindex, int epsilon_size, CProxy_DiagBridge diag_proxy) {
-//   int dest_pe_row = thisIndex.x%2;
-//   int dest_pe_col = thisIndex.y%2;
-//   int eps_dest_pe = dest_pe_row*2 + dest_pe_col;
-
-//   bool borderX = false;
-//   bool borderY = false;
-  
-//   if (thisIndex.x + 1 == numBlocks) {
-//     borderX = true;
-//   }
-
-//   if (thisIndex.y + 1 == numBlocks) {
-//     borderY = true;
-//   }
-
-//   int dataSize = -1;
-
-//   int remElems2 = epsilon_size % eps_rows;  // eps_rows = eps_col square matrix
-//   int stdElems = eps_rows * eps_cols;
-//   int remElems = remElems2 * eps_rows;
-//   int cornerElems = remElems2 * remElems2;
-
-//   int rows = 0;
-//   int cols = 0;
-//   if (borderX && !borderY) {
-//     dataSize = remElems;
-//     rows = remElems2;
-//     cols = eps_rows;
-//   } else if (!borderX && borderY) {
-//     dataSize = remElems;
-//     rows = eps_rows;
-//     cols = remElems2;
-//   } else if (borderX && borderY) {
-//     dataSize = cornerElems;
-//     rows = remElems2;
-//     cols = remElems2;
-//   } else {
-//     dataSize = stdElems;
-//     rows = eps_rows;
-//     cols = eps_rows;
-//   }
-
-//   CkPrintf("tile: x %d y %d   dest_pe %d curr_pe %d \n", thisIndex.x, thisIndex.y, eps_dest_pe, CkMyPe());
-  
-//   DiagMessage* msg; 
-//   msg = new DiagMessage(dataSize);
-//   msg->dest_pe = eps_dest_pe;
-//   msg->x = thisIndex.x;
-//   msg->y = thisIndex.y;
-//   int i = 0;
-//   int idx_row, idx_col;
-//   // DiagBridge db(dataSize);
-//   // db.x = thisIndex.x;
-//   // db.y = thisIndex.y;
-//   // db.eps_pe = CkMyPe();
-//   for (int r = 0; r < eps_rows; r++) {
-//     for (int c = 0; c < eps_cols; c++) {
-//       idx_row = start_row + r;
-//       idx_col = start_col + c;
-//       // db.data[i] = data[r*config.tile_cols + c].re;
-//       msg->data[i] = data[r*config.tile_cols + c].re;
-//       i++;
-//     }
-//   }
-//   // diag_proxy[eps_dest_pe].receiveDataDSimple(msg);
-//   // diag_proxy[eps_dest_pe].waitForData();
-//   // diag_proxy[eps_dest_pe].receiveHeapDSimple(db);
-//   diag_proxy[eps_dest_pe].waitFor();
-//   // return 0;
-// }
-
 void EpsMatrix::screenedExchange() {
 
   FVectorCache* f_cache = fvector_cache_proxy.ckLocalBranch();
@@ -525,11 +453,6 @@ void EpsMatrix::multiply_coulb(){
   contribute(CkCallback(CkReductionTarget(Controller, s_ready), controller_proxy));
 }
 
-void EpsMatrix::done(int result) {
-  if (thisIndex.x ==  0 && thisIndex.y == 0)
-    CkPrintf("Reduction value: %d", result);
-}
-
 DiagMessage* EpsMatrix::receiveDataSimple(DiagMessage* msg) {
   msg->eps_pe = CkMyPe();
   msg->x = thisIndex.x;
@@ -599,14 +522,6 @@ DiagMessage* EpsMatrix::receiveDataSimple(DiagMessage* msg) {
   
   return msg;
 }
-
-void EpsMatrix::receiveHeapSimple() {
-  printf("EPS_MATRIX x %d y %d pe %d\n", thisIndex.x, thisIndex.y, CkMyPe());  
-}
-
-
-// DiagBridge::DiagBridge() {
-// }
 
 void DiagBridge::prepareData(int qindex, int size) {
   // setup the size of the pointed array before receiving data
@@ -724,44 +639,5 @@ void DiagBridge::prepareData(int qindex, int size) {
   contribute(CkCallback(CkReductionTarget(Controller, diag_setup), controller_proxy));
 }
 
-// void DiagBridge::receiveDataDSimple(DiagMessage* msg) {
-//   // copy data into the correct place in your tile
-//   if (not busy) {
-//     CthAwaken(t);
-//     busy = true;
-    
-//     int mype = CkMyPe();
-//     printf("%d RUNNING\n", CKMYPE());
-//     int dest_pe = msg->dest_pe;
-//     int x = msg->x;
-//     int y = msg->y;
-//     // int eps_source_pe  = msg->eps_source_pe;
-//     // int eps_source_pe2  = msg->eps_source_pe2;
-//     // int eps_dest_pe  = msg->dest_pe;
-//     // int start_row = msg->x;
-//     // int start_col = msg->y;
-//     // int loc_row = msg->dest_pe_row;
-//     // int loc_col= msg->dest_pe_col;
-//     if (dest_pe == mype) {
-//       for (int i = 0; i < 1; i++) {
-//         CkPrintf("[DIAGBRIDGE2]: x %d y %d    pe_diag %d\n", x, y, CKMYPE());
-//       }
-//     } else {
-//       printf("pe_diag %d not reached at %d \n", dest_pe, CKMYPE());
-//     }
-//     delete msg;
-//   } else {
-//     total_data++;
-//   }
-  
-// }
-
-// void DiagBridge::waitFor() {
-//   printf("%d WAITING\n", CKMYPE());
-//   busy = false;
-//   t = CthSelf();
-//   CthSuspend();
-
-// }
 
 #include "eps_matrix.def.h"

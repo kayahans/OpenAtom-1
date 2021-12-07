@@ -55,6 +55,10 @@ class Phase4Message : public CMessage_Phase3Message {
 
 class DiagMessage : public CMessage_DiagMessage {
   public:
+  // TODO (kayahans): Using fixed size messages (simpler) 
+  //                  400 is 20 x 20 that is eps_cols x eps_rows
+  //                  global variables
+  
     DiagMessage(int s) {
       size = s;
     }

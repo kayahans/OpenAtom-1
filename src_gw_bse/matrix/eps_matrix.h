@@ -21,33 +21,6 @@ class DiagBridge : public CBase_DiagBridge {
       data = new double[totaldata];
     }
     void prepareData(int qindex, int size);
-    // void pup(PUP::er &p) {
-    //   p|totaldata;
-    //   p|row_size;
-    //   p|col_size;
-    //   p|x;
-    //   p|y;
-    //   p|eps_pe;
-    //   if (p.isUnpacking())
-    //     data = new double[totaldata];
-    //   PUParray(p, data, totaldata);
-    // }
-    
-    // void receiveDataDSimple(DiagMessage* msg);
-    // void waitFor();
-    // void receiveHeapDSimple(const DiagBridge &inData) {
-      // // totaldata = inData.totaldata;
-      // // data = new double[inData.totaldata];
-      // int mype = CkMyPe();
-      // for (int i = 0; i < 1; i++) {
-      //   // data[i] = inData.data[i];
-      //   if (i < 1) {
-      //     CkPrintf("[DIAGBRIDGE] x %d y %d eps_pe %d diag_pe %d i %d value %.6e\n",
-      //       inData.x, inData.y, inData.eps_pe, mype, i, inData.data[i]);
-      //   }
-      // }
-      // thisProxy[thisIndex].waitForData()
-    // }
     
 };
 
@@ -88,13 +61,11 @@ class EpsMatrix : public CBase_EpsMatrix {
     void convergence_check(CProxy_EpsMatrix cmp_proxy);
     void add_compl_two();
     void multiply_coulb();
-    void done(int result);
     void createCopy(CProxy_EpsMatrix other, bool todo);
     void recvCopy(std::vector<complex> new_data);
     void setI(CLA_Matrix_interface mat, bool clean);
     void receiveConvCheck(std::vector<complex> incoming);
     DiagMessage* receiveDataSimple(DiagMessage* msg);
-    void receiveHeapSimple();
     static void done_cb(void *obj){
      ((EpsMatrix*) obj)->round_done();
     }
