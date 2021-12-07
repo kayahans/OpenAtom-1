@@ -8,44 +8,33 @@
 
 class DiagBridge : public CBase_DiagBridge {
   DiagBridge_SDAG_CODE
-  private:
-   unsigned int data_received = 0;
-   unsigned total_data = 0;
-   bool busy, result;
-   CthThread t;
-   void (DiagBridge::*dataHandler)(DiagMessage*);
-
+  
   public:
-    int totaldata;
-    int row_size;
-    int col_size;
-    int total_transfers = 49;
+    unsigned int totaldata;
+    unsigned int row_size, col_size;
+    unsigned int numBlocks;
+    unsigned int proc_rows, proc_cols;
     double* data;
-    int x;
-    int y;
-    int eps_pe;
-
-
     DiagBridge() {};
 
     DiagBridge(int totaldata) : totaldata(totaldata) {
       data = new double[totaldata];
     }
-
-    void pup(PUP::er &p) {
-      p|totaldata;
-      p|row_size;
-      p|col_size;
-      p|x;
-      p|y;
-      p|eps_pe;
-      if (p.isUnpacking())
-        data = new double[totaldata];
-      PUParray(p, data, totaldata);
-    }
     void prepareData(int qindex, int size);
-    void receiveDataDSimple(DiagMessage* msg);
-    void waitFor();
+    // void pup(PUP::er &p) {
+    //   p|totaldata;
+    //   p|row_size;
+    //   p|col_size;
+    //   p|x;
+    //   p|y;
+    //   p|eps_pe;
+    //   if (p.isUnpacking())
+    //     data = new double[totaldata];
+    //   PUParray(p, data, totaldata);
+    // }
+    
+    // void receiveDataDSimple(DiagMessage* msg);
+    // void waitFor();
     // void receiveHeapDSimple(const DiagBridge &inData) {
       // // totaldata = inData.totaldata;
       // // data = new double[inData.totaldata];
@@ -104,9 +93,8 @@ class EpsMatrix : public CBase_EpsMatrix {
     void recvCopy(std::vector<complex> new_data);
     void setI(CLA_Matrix_interface mat, bool clean);
     void receiveConvCheck(std::vector<complex> incoming);
-    DiagMessage* receiveDataSimple();
+    DiagMessage* receiveDataSimple(DiagMessage* msg);
     void receiveHeapSimple();
-    // void copyToMPI(int qindex, int epsilon_size, CProxy_DiagBridge diag_proxy);
     static void done_cb(void *obj){
      ((EpsMatrix*) obj)->round_done();
     }

@@ -22,10 +22,8 @@ module messages {
     complex data[];
   };
 
-  message DiagMessage {
-    double data[];
-  };
-
+  message DiagMessage;
+  
 };
 
 module states {

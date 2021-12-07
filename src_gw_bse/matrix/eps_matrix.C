@@ -529,44 +529,75 @@ void EpsMatrix::done(int result) {
   if (thisIndex.x ==  0 && thisIndex.y == 0)
     CkPrintf("Reduction value: %d", result);
 }
-DiagMessage* EpsMatrix::receiveDataSimple() {
-  // CkCallback cb(CkReductionTarget(EpsMatrix, done), thisProxy);
-  // int i = 1;
-  
-  DiagMessage* msg;
-  msg = new DiagMessage(3);
-  msg->data[0] = 1.0 * thisIndex.x;
-  msg->data[1] = 1.0 * thisIndex.y;
-  msg->data[2] = 1.0 * CkMyPe();
-  msg->dest_pe = CkMyPe();
+
+DiagMessage* EpsMatrix::receiveDataSimple(DiagMessage* msg) {
+  msg->eps_pe = CkMyPe();
   msg->x = thisIndex.x;
   msg->y = thisIndex.y;
-  CkPrintf("[EPS_MATRIX] x %d y %d pe %d\n", thisIndex.x, thisIndex.y, CkMyPe());
-  return msg;
-  // contribute(sizeof(int), &i, CkReduction::sum_int, cb);
-  // return 0;
-  // copy data into the correct place in your tile
-  // int mype = CkMyPe();
-  // int dest_pe = msg->dest_pe;
-  // int x = msg->x;
-  // int y = msg->y;
-  // // int eps_source_pe  = msg->eps_source_pe;
-  // // int eps_source_pe2  = msg->eps_source_pe2;
-  // // int eps_dest_pe  = msg->dest_pe;
-  // // int start_row = msg->x;
-  // // int start_col = msg->y;
-  // // int loc_row = msg->dest_pe_row;
-  // // int loc_col= msg->dest_pe_col;
-  // if (dest_pe == mype) {
-  //   for (int i = 0; i < 1; i++) {
-  //     CkPrintf("[EPSMATRIX] eps tile: x %d y %d    pe_diag %d i %d value %.6e\n", x, y, CKMYPE(), i, msg->data[i]);
-  //   }
-  // } else {
-  //   printf("pe_diag %d not reached at %d \n", dest_pe, CKMYPE());
-  // }
-  // delete[] msg->data;
-  // delete msg;
+
+  bool borderX = false;
+  bool borderY = false;
+  if (thisIndex.x + 1 == numBlocks) {
+    borderX = true;
+  }
+  if (thisIndex.y + 1 == numBlocks) {
+    borderY = true;
+  }
+  int real_epsilon_size = 137;
+  int eps_rows2 = 20;
+  int eps_cols2 = 20;
+
+  unsigned int dataSize = 0;
+  int remElems2 = real_epsilon_size % eps_rows2;  // eps_rows = eps_col square matrix
+  int stdElems = eps_rows2 * eps_cols2;
+  int remElems = remElems2 * eps_rows2;
+  int cornerElems = remElems2 * remElems2;
+
+  int rows = 0;
+  int cols = 0;
+  if (borderX && !borderY) {
+    dataSize = remElems;
+    rows = remElems2;
+    cols = eps_rows2;
+  } else if (!borderX && borderY) {
+    dataSize = remElems;
+    rows = eps_rows2;
+    cols = remElems2;
+  } else if (borderX && borderY) {
+    dataSize = cornerElems;
+    rows = remElems2;
+    cols = remElems2;
+  } else {
+    dataSize = stdElems;
+    rows = eps_rows2;
+    cols = eps_rows2;
+  }
+  msg->size = dataSize;
+  msg->rows = rows;
+  msg->cols = cols;
+
+  int idx_col, idx_row;
+  int i = 0;
+  double first, last;
+
+  for (int r = 0; r < rows; r++) {
+    for (int c = 0; c < cols; c++) {
+      idx_row = start_row + r;
+      idx_col = start_col + c;
+      
+      if (r == 0 && c == 0) {
+        first = data[r*config.tile_cols + c].re;
+      }
+      if (r == rows -1  && c == cols -1 ) {
+        last = data[r*config.tile_cols + c].re;
+      }
+      msg->data[i] = data[r*config.tile_cols + c].re;
+      i++;
+    }
+  }
+  // CkPrintf("[EPS_MATRIX] x %d y %d pe %d size %d val0 %.6e vallast %.6e\n", thisIndex.x, thisIndex.y, CkMyPe(), dataSize, first, last);
   
+  return msg;
 }
 
 void EpsMatrix::receiveHeapSimple() {
@@ -614,6 +645,7 @@ void DiagBridge::prepareData(int qindex, int size) {
   int x_num_tiles = 0;
   int y_num_tiles = 0;
 
+  
   for (int x=0; x < numx; x++) {
     for (int y=0; y < numy; y++) {
       int dest_pe_row = x%proc_rows;
@@ -653,11 +685,11 @@ void DiagBridge::prepareData(int qindex, int size) {
         } else if (borderX && borderY) {
           xy_datasize = cornerElems;
           rows = remElems2;
-          cols = remElems2;          
+          cols = remElems2;
         } else {
           xy_datasize = stdElems;
           rows = eps_rows;
-          cols = eps_rows;          
+          cols = eps_rows;
         }
 
         // CkPrintf("x %d y %d pe %d xydata %d rows %d cols %d\n", x, y, CkMyPe(), xy_datasize, rows, cols);
@@ -672,22 +704,23 @@ void DiagBridge::prepareData(int qindex, int size) {
   col_size = col_size / x_num_tiles;
 
   // Setup the pointer to be used in MPI
-  diagData = new diagData_t[4];
-  diagData[0].input = new double[totaldata];
-  // diagData->inputsize = totaldata; // totaldata = row_size * col_size
-  // diagData->row_size = row_size;
-  // diagData->col_size = col_size;
+  diagData = new diagData_t;
+  diagData->inputsize = totaldata; // totaldata = row_size * col_size
+  diagData->input = new double[totaldata];
+  
+  diagData->row_size = row_size;
+  diagData->col_size = col_size;
 
-  // diagData->eig_e = new double[size];
-  // diagData->eig_v = new double[size*size];  // Not sure which pe gets the final result
-  // diagData->dim = size;
-  // diagData->qindex = qindex;
-  // diagData->nb = eps_rows;
-  // diagData->n = size;
+  diagData->eig_e = new double[size];
+  diagData->eig_v = new double[size*size];  // Not sure which pe gets the final result
+  
+  diagData->qindex = qindex;
+  diagData->nb = eps_rows;
+  diagData->n = size;
 
-  // diagData->nprow = proc_rows;
-  // diagData->npcol = proc_cols;
-  CkPrintf("[DIAGONALIZER] Created a pointer with size %d at pe %d for epsilon qindex %d\n", totaldata, CkMyPe(), qindex);
+  diagData->nprow = proc_rows;
+  diagData->npcol = proc_cols;
+  CkPrintf("[DIAGONALIZER] Created a pointer with totalsize %d dim %d at pe %d for epsilon qindex %d\n", totaldata, size, CkMyPe(), qindex);
   contribute(CkCallback(CkReductionTarget(Controller, diag_setup), controller_proxy));
 }
 

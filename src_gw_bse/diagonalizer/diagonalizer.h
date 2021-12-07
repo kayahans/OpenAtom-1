@@ -3,7 +3,7 @@
 // #include "diagonalizer.decl.h"
 
 struct diagData_t {
-  int dim;  // dim x dim matrix
+  // int dim;  // dim x dim matrix
   int qindex;
 
   int num_handoff = 8;  // Number of diagonalizations to be performed
@@ -20,10 +20,10 @@ struct diagData_t {
   int inputsize = 0;
   int row_size = 0;
   int col_size = 0;
-  int nprow = 2;
-  int npcol = 2;
-  int n = 8;
-  int nb = 16;
+  int nprow = 0;
+  int npcol = 0;
+  int n = 0;
+  int nb = 0;
 };
 
 void restartCharm();
