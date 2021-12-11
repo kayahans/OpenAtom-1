@@ -396,7 +396,7 @@ module controller {
 
       when s_ready() serial {
         CkPrintf("[CONTROLLER] Prepare transferring data to MPI\n");
-        diag_bridge_proxy.prepareData(qindex, real_epsilon_size);
+        diag_bridge_proxy.prepareData(qindex, real_epsilon_size, qpts);
       }
       when diag_setup() serial {
         CkPrintf("[CONTROLLER] Transfer data to MPI\n");

@@ -10,17 +10,17 @@ class DiagBridge : public CBase_DiagBridge {
   DiagBridge_SDAG_CODE
   
   public:
-    unsigned int totaldata;
     unsigned int row_size, col_size;
-    unsigned int numBlocks;
-    unsigned int proc_rows, proc_cols;
+    unsigned int totaldata; // Total data in the diagData pointer
+    unsigned int numBlocks; // Number of blocks MB X MB block grid
+    unsigned int proc_rows, proc_cols; // processor grid
     double* data;
     DiagBridge() {};
 
     DiagBridge(int totaldata) : totaldata(totaldata) {
       data = new double[totaldata];
     }
-    void prepareData(int qindex, int size);
+    void prepareData(int qindex, int size, int num_qpts);
     
 };
 
@@ -32,8 +32,6 @@ class EpsMatrix : public CBase_EpsMatrix {
     unsigned qindex;
 
     unsigned data_received;
-    unsigned proc_rows;
-    unsigned proc_cols;
     double total_time;
     CLA_Matrix_interface matrix;
     unsigned int blockSize, numBlocks, block;

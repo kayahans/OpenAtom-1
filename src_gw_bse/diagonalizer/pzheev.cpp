@@ -84,7 +84,7 @@ int main(int argc, char **argv){
 
 
     // Return to MPI
-    const int total_iter  = 8; // diagData->num_handoff;
+    const int total_iter  = diagData->num_handoffs;
     int iternum = 1;
 
     for ( ; iternum <= total_iter; iternum++) {

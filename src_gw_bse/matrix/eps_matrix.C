@@ -467,13 +467,10 @@ DiagMessage* EpsMatrix::receiveDataSimple(DiagMessage* msg) {
     borderY = true;
   }
   int real_epsilon_size = 137;
-  int eps_rows2 = 20;
-  int eps_cols2 = 20;
-
   unsigned int dataSize = 0;
-  int remElems2 = real_epsilon_size % eps_rows2;  // eps_rows = eps_col square matrix
-  int stdElems = eps_rows2 * eps_cols2;
-  int remElems = remElems2 * eps_rows2;
+  int remElems2 = real_epsilon_size % eps_rows;  // eps_rows = eps_col square matrix
+  int stdElems = eps_rows * eps_cols;
+  int remElems = remElems2 * eps_rows;
   int cornerElems = remElems2 * remElems2;
 
   int rows = 0;
@@ -481,10 +478,10 @@ DiagMessage* EpsMatrix::receiveDataSimple(DiagMessage* msg) {
   if (borderX && !borderY) {
     dataSize = remElems;
     rows = remElems2;
-    cols = eps_rows2;
+    cols = eps_rows;
   } else if (!borderX && borderY) {
     dataSize = remElems;
-    rows = eps_rows2;
+    rows = eps_rows;
     cols = remElems2;
   } else if (borderX && borderY) {
     dataSize = cornerElems;
@@ -492,8 +489,8 @@ DiagMessage* EpsMatrix::receiveDataSimple(DiagMessage* msg) {
     cols = remElems2;
   } else {
     dataSize = stdElems;
-    rows = eps_rows2;
-    cols = eps_rows2;
+    rows = eps_rows;
+    cols = eps_rows;
   }
   msg->size = dataSize;
   msg->rows = rows;
@@ -503,11 +500,13 @@ DiagMessage* EpsMatrix::receiveDataSimple(DiagMessage* msg) {
   int i = 0;
   double first, last;
 
-  for (int r = 0; r < rows; r++) {
-    for (int c = 0; c < cols; c++) {
+  // Transfer data to column major
+  for (int c = 0; c < cols; c++) {
+    for (int r = 0; r < rows; r++) {
       idx_row = start_row + r;
       idx_col = start_col + c;
       
+      // CHARM++ data is row-major
       if (r == 0 && c == 0) {
         first = data[r*config.tile_cols + c].re;
       }
@@ -523,42 +522,44 @@ DiagMessage* EpsMatrix::receiveDataSimple(DiagMessage* msg) {
   return msg;
 }
 
-void DiagBridge::prepareData(int qindex, int size) {
-  // setup the size of the pointed array before receiving data
-  // Block cyclic mapping
-  // size: rank of the matrix for an N x N invertable matrix size is N
+void DiagBridge::prepareData(int qindex, int eps_size, int num_qpts) {
+  // This routine sets up the containers (diagData) for each element of process grid
+  // 2D Block cyclic mapping
+  // https://www.netlib.org/scalapack/slug/node76.html, Fig. 4.6
+  // Blocks are square and block sizes are equal to EpsMatrix tile size in charm++
+  // eps_size: rank of the matrix for an N x N invertable matrix size is N
   // qindex: q index of the epsilon. Not really needed here, but used in debugging
 
   int mype = CkMyPe();
   
-  int remElems2 = size % eps_rows;  // square matrix
   // Possible Charm++ tile sizes 
-  int stdElems = eps_rows * eps_rows;
-  int remElems = remElems2 * eps_rows;
-  int cornerElems = remElems2 * remElems2;
+  int remElems2 = eps_size % eps_rows;  
+  int stdElems = eps_rows * eps_rows; // square matrix 
+  int remElems = remElems2 * eps_rows; // sides of eps
+  int cornerElems = remElems2 * remElems2; // corner of eps
 
   // Proc distribution to be used for diagonalization
   GWBSE* gwbse = GWBSE::get();
-  int proc_rows = 2; // gwbse->gw_parallel.proc_rows;
-  int proc_cols = 2; // gwbse->gw_parallel.proc_cols;
+  // TODO (kayahans): read from input
+  proc_rows = 2; // gwbse->gw_parallel.proc_rows;
+  proc_cols = 2; // gwbse->gw_parallel.proc_cols;
 
-  // Epsilon matrix is tiled as numx by numy charm++ tiles
-  int numBlocks = size / eps_rows + 1;
+  // Number of blocks
+  numBlocks = eps_size / eps_rows + 1;
+  // Eps is a square matrix
   int numx = numBlocks;
-  int numy = numx;
+  int numy = numBlocks;
 
-  // CkPrintf("size %d eps_rows %d numx %d numy %d proc_rows %d proc_cols %d \n", size, eps_rows, numx, numy, proc_rows, proc_cols);
-  
-  // Reset data sizes each time this method is invoked
-  totaldata = 0; 
+  // Dimensions of the matrix stored on process grid
   row_size = 0;
   col_size = 0;
+  totaldata = 0; // totaldata = row_size * col_size
 
-  // These are used to count the number of charm++ tiles in a single diagData object
+  // These are used to count the number of charm++ tiles in a process grid block
   int x_prev = -1;
   int y_prev = -1;
-  int x_num_tiles = 0;
-  int y_num_tiles = 0;
+  int x_num_tiles = 0; // num of charm++ tiles in row dimension
+  int y_num_tiles = 0; // num of charm++ tiles in col dimension
 
   
   for (int x=0; x < numx; x++) {
@@ -606,7 +607,6 @@ void DiagBridge::prepareData(int qindex, int size) {
           rows = eps_rows;
           cols = eps_rows;
         }
-
         // CkPrintf("x %d y %d pe %d xydata %d rows %d cols %d\n", x, y, CkMyPe(), xy_datasize, rows, cols);
         totaldata += xy_datasize;
         row_size  += rows;
@@ -618,24 +618,26 @@ void DiagBridge::prepareData(int qindex, int size) {
   row_size = row_size / y_num_tiles;
   col_size = col_size / x_num_tiles;
 
-  // Setup the pointer to be used in MPI
+  // Setup the container to be transferred to MPI
   diagData = new diagData_t;
-  diagData->inputsize = totaldata; // totaldata = row_size * col_size
-  diagData->input = new double[totaldata];
+  diagData->qindex = qindex;
+  diagData->num_handoffs = num_qpts;
   
+  diagData->inputsize = totaldata; 
   diagData->row_size = row_size;
   diagData->col_size = col_size;
-
-  diagData->eig_e = new double[size];
-  diagData->eig_v = new double[size*size];  // Not sure which pe gets the final result
-  
-  diagData->qindex = qindex;
-  diagData->nb = eps_rows;
-  diagData->n = size;
-
   diagData->nprow = proc_rows;
   diagData->npcol = proc_cols;
-  CkPrintf("[DIAGONALIZER] Created a pointer with totalsize %d dim %d at pe %d for epsilon qindex %d\n", totaldata, size, CkMyPe(), qindex);
+  diagData->nb = eps_rows;
+  diagData->n = eps_size;
+
+  diagData->input = new double[totaldata];
+  // TODO (kayahans): Not sure which pe gets the final result, for now allocate this in all 
+  // Later when we decide how to distribute eigenvectors/values, we can make this smarter
+  diagData->eig_e = new double[eps_size];
+  diagData->eig_v = new double[eps_size*eps_size];  
+  
+  CkPrintf("[DIAGONALIZER] Created a pointer with totalsize %d dim %d at pe %d for epsilon qindex %d\n", totaldata, eps_size, CkMyPe(), qindex);
   contribute(CkCallback(CkReductionTarget(Controller, diag_setup), controller_proxy));
 }
 

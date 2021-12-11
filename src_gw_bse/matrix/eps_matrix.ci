@@ -84,37 +84,34 @@ module eps_matrix {
 
   group DiagBridge{
     entry DiagBridge();
-    entry void prepareData(int qindex, int size);
+    entry void prepareData(int qindex, int size, int num_qpts);
     entry void copyToMPI(int qindex, int real_epsilon_size, CProxy_EpsMatrix smatrix_proxy) {
       serial {
-        // TODO(kayahans): Currently this only works for Si2 example with 
-        //                10 Ry Eps cutoff (< 140 g vectors) on 2x2 processors
         int mype = CkMyPe();
-        int numBlocks = 7;
-        int num_pe_row = 2;
-        int num_pe_col = 2;
-
         for (int mat_row = 0; mat_row < numBlocks; mat_row++) {
           for (int mat_col = 0; mat_col < numBlocks; mat_col++) { 
-            int dest_pe_row = mat_row%num_pe_row;
-            int dest_pe_col = mat_col%num_pe_col;
-            int dest_pe = dest_pe_row*2 + dest_pe_col;
+            int dest_pe_row = mat_row%proc_rows;
+            int dest_pe_col = mat_col%proc_cols;
+            // PE array is row major, hence dest_pe below
+            // https://www.netlib.org/scalapack/slug/node70.html
+            int dest_pe = dest_pe_row*proc_cols + dest_pe_col;
             
             if (mype == dest_pe) { 
               DiagMessage* msg;
               msg = new DiagMessage();
               msg = smatrix_proxy(mat_row, mat_col).receiveDataSimple(msg);
-              int last = msg->size - 1;
-              double first_val = msg->data[0];
-              double last_val = msg->data[last];
+              // int last = msg->size - 1;
+              // double first_val = msg->data[0];
+              // double last_val = msg->data[last];
               // CkPrintf("[copyToMPI] x %d y %d last %d first_val %.6e last_val %.6e\n", msg->x , msg->y, last, first_val, last_val);
-              int loc_mat_row = (mat_row - dest_pe_row) / num_pe_row;
-              int loc_mat_col = (mat_col - dest_pe_col) / num_pe_col;
+              int loc_mat_row = (mat_row - dest_pe_row) / proc_rows;
+              int loc_mat_col = (mat_col - dest_pe_col) / proc_cols;
               int start_index = ((loc_mat_col * diagData->row_size) + loc_mat_row) * 20;
               // CkPrintf("[bcyclic] loc_x %d loc_y %d mat_row %d mat_col %d start_index %d of %d col size %d\n", loc_mat_row, loc_mat_col, mat_row, mat_col, start_index, diagData->inputsize, diagData->col_size);
               for (int i = 0; i < msg->size; i++) {
                 int idx_row = i % msg->rows;
-                int idx_col = i / msg->cols;
+                // int idx_col = i / msg->cols;
+                int idx_col = i / msg->rows;
                 int bl_cyclic_index = start_index +  idx_col * diagData->row_size + idx_row;
                 // CkPrintf("[bcyclic] tot_size %d (%dx%d) row/col %d/%d x %d y %d i %d blc %d\n", diagData->inputsize, diagData->row_size, diagData->col_size, idx_row, idx_col, msg->x , msg->y, i , bl_cyclic_index);
                 diagData->input[bl_cyclic_index] = msg->data[i];

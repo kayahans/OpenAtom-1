@@ -58,11 +58,9 @@ class DiagMessage : public CMessage_DiagMessage {
   // TODO (kayahans): Using fixed size messages (simpler) 
   //                  400 is 20 x 20 that is eps_cols x eps_rows
   //                  global variables
-  
-    DiagMessage(int s) {
-      size = s;
+
+    DiagMessage() {
     }
-    DiagMessage() {};
     double data[400];
     int size;
     int x;
