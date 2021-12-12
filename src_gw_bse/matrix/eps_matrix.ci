@@ -86,42 +86,45 @@ module eps_matrix {
     entry DiagBridge();
     entry void prepareData(int qindex, int size, int num_qpts);
     entry void copyToMPI(int qindex, int real_epsilon_size, CProxy_EpsMatrix smatrix_proxy) {
+      // This routine copies S-matrix chares to PE of DiagBridge
+      // These data then are transferred to SCALAPACK
+      // Block cyclic distribution is implemented
+      // Block size of S-matrix chares are equal to the block size of scalapack
+      // S-matrix is a square matrix 
+      // This is not guaranteed to work for non-square matrices
       serial {
+        // printf("Numblocks: %d realepsilonsize %d\n", numBlocks, real_epsilon_size);
         int mype = CkMyPe();
-        for (int mat_row = 0; mat_row < numBlocks; mat_row++) {
-          for (int mat_col = 0; mat_col < numBlocks; mat_col++) { 
-            int dest_pe_row = mat_row%proc_rows;
-            int dest_pe_col = mat_col%proc_cols;
+        for (int tile_row = 0; tile_row < numBlocks; tile_row++) {
+          for (int tile_col = 0; tile_col < numBlocks; tile_col++) { 
+            int dest_pe_row = tile_row%proc_rows;
+            int dest_pe_col = tile_col%proc_cols;
             // PE array is row major, hence dest_pe below
             // https://www.netlib.org/scalapack/slug/node70.html
             int dest_pe = dest_pe_row*proc_cols + dest_pe_col;
-            
+            CkPrintf("pe %d eps_tile r/c %d %d \n",mype, tile_row, tile_col);
             if (mype == dest_pe) { 
               DiagMessage* msg;
               msg = new DiagMessage();
-              msg = smatrix_proxy(mat_row, mat_col).receiveDataSimple(msg);
-              // int last = msg->size - 1;
-              // double first_val = msg->data[0];
-              // double last_val = msg->data[last];
-              // CkPrintf("[copyToMPI] x %d y %d last %d first_val %.6e last_val %.6e\n", msg->x , msg->y, last, first_val, last_val);
-              int loc_mat_row = (mat_row - dest_pe_row) / proc_rows;
-              int loc_mat_col = (mat_col - dest_pe_col) / proc_cols;
-              int start_index = ((loc_mat_col * diagData->row_size) + loc_mat_row) * 20;
-              // CkPrintf("[bcyclic] loc_x %d loc_y %d mat_row %d mat_col %d start_index %d of %d col size %d\n", loc_mat_row, loc_mat_col, mat_row, mat_col, start_index, diagData->inputsize, diagData->col_size);
+              msg->eps_size = real_epsilon_size;
+              msg = smatrix_proxy(tile_row, tile_col).receiveDataSimple(msg);
+              int loc_tile_row = (tile_row - dest_pe_row) / proc_rows;
+              int loc_tile_col = (tile_col - dest_pe_col) / proc_cols;
+              
+              int start_index = ((loc_tile_col * diagData->row_size) + loc_tile_row) * 20;
+              int bl_cyclic_index;
               for (int i = 0; i < msg->size; i++) {
                 int idx_row = i % msg->rows;
-                // int idx_col = i / msg->cols;
                 int idx_col = i / msg->rows;
-                int bl_cyclic_index = start_index +  idx_col * diagData->row_size + idx_row;
-                // CkPrintf("[bcyclic] tot_size %d (%dx%d) row/col %d/%d x %d y %d i %d blc %d\n", diagData->inputsize, diagData->row_size, diagData->col_size, idx_row, idx_col, msg->x , msg->y, i , bl_cyclic_index);
+                bl_cyclic_index = start_index +  idx_col * diagData->row_size + idx_row;
                 diagData->input[bl_cyclic_index] = msg->data[i];
               }
               delete msg;
-            }
-          }
-        }
+            } // end if 
+          } // end for tile_col
+        } // end for tile_row
         contribute(CkCallback(CkReductionTarget(Controller, mpi_copy_complete), controller_proxy));
-      }
+      } // end serial
     } // end copyToMPI
     entry void copyFromMPI(int qindex, int real_epsilon_size, CProxy_EpsMatrix smatrix_proxy) {
       serial {

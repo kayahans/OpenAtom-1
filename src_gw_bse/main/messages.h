@@ -61,8 +61,9 @@ class DiagMessage : public CMessage_DiagMessage {
 
     DiagMessage() {
     }
-    double data[400];
+    std::complex<double> data[400];
     int size;
+    int eps_size;
     int x;
     int y;
     int eps_pe;

@@ -1,7 +1,6 @@
+#include <complex>
 #ifndef _diagonalizer_h_
 #define _diagonalizer_h_
-// #include "diagonalizer.decl.h"
-
 struct diagData_t {
   int qindex;
 
@@ -16,9 +15,9 @@ struct diagData_t {
   int n = 0; // size of the original epsilon matrix
   int nb = 0; // block size
   
-  double* input;  // Input matrix (row_size x col_size = inputsize)
-  double* eig_v;  // Eigenvectors (n x n)
-  double* eig_e;  // Eigenvalues (n x 1)
+  std::complex<double>* input;  // Input matrix (row_size x col_size = inputsize)
+  std::complex<double>* eig_v;  // Eigenvectors (n x n)
+  std::complex<double>* eig_e;  // Eigenvalues (n x 1)
 
 };
 

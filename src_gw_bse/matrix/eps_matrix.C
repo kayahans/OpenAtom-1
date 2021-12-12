@@ -466,7 +466,7 @@ DiagMessage* EpsMatrix::receiveDataSimple(DiagMessage* msg) {
   if (thisIndex.y + 1 == numBlocks) {
     borderY = true;
   }
-  int real_epsilon_size = 137;
+  int real_epsilon_size = msg->eps_size;
   unsigned int dataSize = 0;
   int remElems2 = real_epsilon_size % eps_rows;  // eps_rows = eps_col square matrix
   int stdElems = eps_rows * eps_cols;
@@ -498,7 +498,6 @@ DiagMessage* EpsMatrix::receiveDataSimple(DiagMessage* msg) {
 
   int idx_col, idx_row;
   int i = 0;
-  double first, last;
 
   // Transfer data to column major
   for (int c = 0; c < cols; c++) {
@@ -507,17 +506,11 @@ DiagMessage* EpsMatrix::receiveDataSimple(DiagMessage* msg) {
       idx_col = start_col + c;
       
       // CHARM++ data is row-major
-      if (r == 0 && c == 0) {
-        first = data[r*config.tile_cols + c].re;
-      }
-      if (r == rows -1  && c == cols -1 ) {
-        last = data[r*config.tile_cols + c].re;
-      }
-      msg->data[i] = data[r*config.tile_cols + c].re;
+      msg->data[i].real(data[r*config.tile_cols + c].re);
+      msg->data[i].imag(data[r*config.tile_cols + c].im);
       i++;
     }
   }
-  // CkPrintf("[EPS_MATRIX] x %d y %d pe %d size %d val0 %.6e vallast %.6e\n", thisIndex.x, thisIndex.y, CkMyPe(), dataSize, first, last);
   
   return msg;
 }
@@ -607,7 +600,6 @@ void DiagBridge::prepareData(int qindex, int eps_size, int num_qpts) {
           rows = eps_rows;
           cols = eps_rows;
         }
-        // CkPrintf("x %d y %d pe %d xydata %d rows %d cols %d\n", x, y, CkMyPe(), xy_datasize, rows, cols);
         totaldata += xy_datasize;
         row_size  += rows;
         col_size  += cols;
@@ -631,13 +623,12 @@ void DiagBridge::prepareData(int qindex, int eps_size, int num_qpts) {
   diagData->nb = eps_rows;
   diagData->n = eps_size;
 
-  diagData->input = new double[totaldata];
+  diagData->input = new std::complex<double>[totaldata];
   // TODO (kayahans): Not sure which pe gets the final result, for now allocate this in all 
   // Later when we decide how to distribute eigenvectors/values, we can make this smarter
-  diagData->eig_e = new double[eps_size];
-  diagData->eig_v = new double[eps_size*eps_size];  
-  
-  CkPrintf("[DIAGONALIZER] Created a pointer with totalsize %d dim %d at pe %d for epsilon qindex %d\n", totaldata, eps_size, CkMyPe(), qindex);
+  diagData->eig_e = new std::complex<double>[eps_size];
+  diagData->eig_v = new std::complex<double>[eps_size*eps_size];  
+  CkPrintf("[DIAGONALIZER] Created a pointer with totalsize %d numblocks %d for S matrix global dim %d at pe %d for qindex %d\n", totaldata, numBlocks, eps_size, CkMyPe(), qindex);
   contribute(CkCallback(CkReductionTarget(Controller, diag_setup), controller_proxy));
 }
 

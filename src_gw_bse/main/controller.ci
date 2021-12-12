@@ -390,7 +390,8 @@ module controller {
       }
       when copyComplete(bool success) {}
       serial {
-        matrixWrite(s_matrix1D_proxy, "data/Smatrix", writeCB);
+        std::string filename = "data/Smatrix_q" + std::to_string(qindex);
+        matrixWrite(s_matrix1D_proxy, filename, writeCB);
       }
       // Print S-matrix to verify (end)
 
