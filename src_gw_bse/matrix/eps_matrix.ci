@@ -1,7 +1,7 @@
 module eps_matrix {
   include "ckcomplex.h";
   include "CLA_Matrix.h";
-
+  
   extern module matrix;
   extern module messages;
   extern module psi_cache;
@@ -23,13 +23,17 @@ module eps_matrix {
     entry void receiveFs(Phase3Message*);
     entry void bareExchange();
     entry void screenedExchange();
+    entry void screenedExchangeGPP();
     entry void coh();
     entry void findAlpha();
     entry void multiply_coulb();
+    entry void print_col(int num);
+    entry void print_row(int num);
     
     entry void createCopy(CProxy_EpsMatrix other, bool todo);
     entry void recvCopy(std::vector<complex> new_data);
     entry [sync] DiagMessage* receiveDataSimple(DiagMessage* msg);
+    entry [sync] DiagMessage* sendDataSimple(DiagMessage* msg);
     
     
     entry void pdgemmSendInput(CProxy_EpsMatrix output, bool aOrB) {
@@ -102,7 +106,7 @@ module eps_matrix {
             // PE array is row major, hence dest_pe below
             // https://www.netlib.org/scalapack/slug/node70.html
             int dest_pe = dest_pe_row*proc_cols + dest_pe_col;
-            CkPrintf("pe %d eps_tile r/c %d %d \n",mype, tile_row, tile_col);
+            // CkPrintf("pe %d eps_tile r/c %d %d \n",mype, tile_row, tile_col);
             if (mype == dest_pe) { 
               DiagMessage* msg;
               msg = new DiagMessage();
@@ -111,13 +115,14 @@ module eps_matrix {
               int loc_tile_row = (tile_row - dest_pe_row) / proc_rows;
               int loc_tile_col = (tile_col - dest_pe_col) / proc_cols;
               
-              int start_index = ((loc_tile_col * diagData->row_size) + loc_tile_row) * 20;
+              int start_index = ((loc_tile_col * diagData->row_size) + loc_tile_row) * eps_rows;
               int bl_cyclic_index;
               for (int i = 0; i < msg->size; i++) {
                 int idx_row = i % msg->rows;
                 int idx_col = i / msg->rows;
                 bl_cyclic_index = start_index +  idx_col * diagData->row_size + idx_row;
-                diagData->input[bl_cyclic_index] = msg->data[i];
+                diagData->input[bl_cyclic_index].real(msg->data[i].re);
+                diagData->input[bl_cyclic_index].imag(msg->data[i].im);
               }
               delete msg;
             } // end if 
@@ -126,14 +131,197 @@ module eps_matrix {
         contribute(CkCallback(CkReductionTarget(Controller, mpi_copy_complete), controller_proxy));
       } // end serial
     } // end copyToMPI
+    
+    // entry void copyFromMPI(int qindex, int real_epsilon_size, CProxy_EpsMatrix smatrix_proxy) {
+    //   // This routine copies S-matrix chares to PE of DiagBridge
+    //   // These data then are transferred to SCALAPACK
+    //   // Block cyclic distribution is implemented
+    //   // Block size of S-matrix chares are equal to the block size of scalapack
+    //   // S-matrix is a square matrix 
+    //   // This is not guaranteed to work for non-square matrices
+    //   serial {
+    //     // printf("Numblocks: %d realepsilonsize %d\n", numBlocks, real_epsilon_size);
+    //     int mype = CkMyPe();
+    //     for (int tile_row = 0; tile_row < numBlocks; tile_row++) {
+    //       for (int tile_col = 0; tile_col < numBlocks; tile_col++) { 
+    //         int dest_pe_row = tile_row%proc_rows;
+    //         int dest_pe_col = tile_col%proc_cols;
+    //         // PE array is row major, hence dest_pe below
+    //         // https://www.netlib.org/scalapack/slug/node70.html
+    //         int dest_pe = dest_pe_row*proc_cols + dest_pe_col;
+    //         // CkPrintf("pe %d eps_tile r/c %d %d \n",mype, tile_row, tile_col);
+    //         if (mype == dest_pe) { 
+    //           CkPrintf("pe %d eps_tile r/c %d %d \n",mype, tile_row, tile_col);
+    //           DiagMessage* msg;
+    //           msg = new DiagMessage();
+    //           msg->eps_size = real_epsilon_size;
+    //           msg->x = tile_row;
+    //           msg->y = tile_col;
+
+    //           bool borderX = false;
+    //           bool borderY = false;
+    //           if (tile_row + 1 == numBlocks) {
+    //             borderX = true;
+    //           }
+    //           if (tile_col + 1 == numBlocks) {
+    //             borderY = true;
+    //           }
+
+    //           unsigned int dataSize = 0;
+    //           int remElems2 = real_epsilon_size % eps_rows;  // eps_rows = eps_col square matrix
+    //           int stdElems = eps_rows * eps_cols;
+    //           int remElems = remElems2 * eps_rows;
+    //           int cornerElems = remElems2 * remElems2;
+
+    //           int rows = 0;
+    //           int cols = 0;
+    //           if (borderX && !borderY) {
+    //             dataSize = remElems;
+    //             rows = remElems2;
+    //             cols = eps_rows;
+    //           } else if (!borderX && borderY) {
+    //             dataSize = remElems;
+    //             rows = eps_rows;
+    //             cols = remElems2;
+    //           } else if (borderX && borderY) {
+    //             dataSize = cornerElems;
+    //             rows = remElems2;
+    //             cols = remElems2;
+    //           } else {
+    //             dataSize = stdElems;
+    //             rows = eps_rows;
+    //             cols = eps_rows;
+    //           }
+    //           msg->size = dataSize;
+    //           msg->rows = rows;
+    //           msg->cols = cols;
+    //           int loc_tile_row = (tile_row - dest_pe_row) / proc_rows;
+    //           int loc_tile_col = (tile_col - dest_pe_col) / proc_cols;
+    //           int start_index = ((loc_tile_col * diagData->row_size) + loc_tile_row) * eps_rows;
+    //           int bl_cyclic_index;
+    //           for (int i = 0; i < msg->size; i++) {
+    //             int idx_row = i % msg->rows;
+    //             int idx_col = i / msg->rows;
+    //             bl_cyclic_index = start_index +  idx_col * diagData->row_size + idx_row;
+    //             msg->data[i].re = diagData->input[bl_cyclic_index].real();
+    //             msg->data[i].im = diagData->input[bl_cyclic_index].imag();
+    //           }
+    //           msg = smatrix_proxy(tile_row, tile_col).sendDataSimple(msg);
+    //           delete msg;
+    //         } // end if 
+    //       } // end for tile_col
+    //     } // end for tile_row
+    //     contribute(CkCallback(CkReductionTarget(Controller, mpi_copy_complete), controller_proxy));
+    //   } // end serial
+    // } // end copyFromMPI
+    
     entry void copyFromMPI(int qindex, int real_epsilon_size, CProxy_EpsMatrix smatrix_proxy) {
       serial {
+        // int mype = CkMyPe();
+        int mype = CkMyPe();
+        // Local matrix output from scalapack (Z) is row_size X col_size matrix
+        // Divide these by block sizes (eps_rows/cols), then you get tiling of 
+        // the scalapack matrix (Z) with num_tile_row x num_tile_col
+        int num_tile_row = (row_size-1)/eps_rows + 1;
+        int num_tile_col = (col_size-1)/eps_cols + 1;
+        // Processors are distributed column major
+        int pe_row = mype / proc_cols;
+        int pe_col = mype % proc_cols;
+
+        CkPrintf("Diag %dx%d charm %dx%d\n", diagData->pe_row, diagData->pe_col, pe_row, pe_col);
+        for (int idx_row = 0; idx_row < num_tile_row; idx_row++) {
+          for (int idx_col = 0; idx_col < num_tile_col; idx_col++) {
+            // eps_row/col_idx are the block tiling indices in global epsilon matrix
+            // Transpose here
+            int eps_row_idx = idx_row*proc_rows + pe_row;
+            int eps_col_idx = idx_col*proc_cols + pe_col;
+            // glob_start_row/col are the (I,J) index of the first element in tile 
+            int glob_start_row = eps_row_idx * eps_rows;
+            int glob_start_col = eps_col_idx * eps_rows;
+            
+            bool borderX = false;
+            bool borderY = false;
+            if (idx_row == num_tile_row - 1 && row_size % eps_rows > 0)
+              borderX = true;
+            if (idx_col == num_tile_col - 1 && col_size % eps_cols > 0)
+              borderY = true;
+            
+            // The tile at eps_row/col_idx is a num_loc_rows/cols matrix
+            int num_loc_rows = eps_rows;
+            int num_loc_cols = eps_cols;
+            if (borderX)
+              num_loc_rows = row_size % eps_rows;
+            if (borderY)
+              num_loc_cols = col_size % eps_cols;
+            
+            int tot_loc_data = num_loc_rows * num_loc_cols;
+            
+            int dd_row_size = diagData->row_size;
+            int dd_col_size = diagData->col_size;
+            DiagMessage* msg;
+            msg = new DiagMessage();
+            msg->size = tot_loc_data;
+            msg->eps_size = real_epsilon_size;
+            msg->x = eps_row_idx;
+            msg->y = eps_col_idx;
+            msg->rows = num_loc_rows;
+            msg->cols = num_loc_cols;
+            CkPrintf("pe %d inputsize %d idx r/c %d/%d eps r/c %dx%d \n", mype, totaldata, idx_row, idx_col, eps_row_idx, eps_col_idx);
+    // //         for (int j = 0; j < nqA; j++) {
+    // //     for (int i = 0; i < mpA; i++) {
+    // //         // diagData->eig_v[(i*nqA)+j] = Z[(i*nqA)+j];
+    // //         int global_tile_row = i / 20;
+    // //         int global_tile_col = j / 20;
+    // //         int global_row = i + global_tile_row * 20;
+    // //         int global_col = j + global_tile_col * 20;
+    // //         printf("[DIAGONALIZER] pe %d eig_v (%d,%d) global (%d, %d) idx %d %.8e %d, %d\n",
+    // //           iam, i, j, global_row, global_col, j, Z[(j*mpA)+i].real(), myrow+1, mycol+1);
+    // //     }
+    // // }    
+
+            int start_index = (idx_col * dd_row_size) * eps_cols + idx_row * eps_rows;
+            // int start_index = (idx_row * dd_col_size) * eps_rows + idx_col * eps_cols;
+            int bl_cyclic_index;
+            // if (idx_row == 0 && idx_col == 0) {
+
+            
+              for (int j = 0; j < num_loc_cols; j++) { 
+                for (int i = 0; i < num_loc_rows; i++) { 
+                bl_cyclic_index = start_index + (j * dd_row_size) + i;
+                msg->data[j*num_loc_rows + i].re = diagData->eig_v[bl_cyclic_index].real();
+                msg->data[j*num_loc_rows + i].im = diagData->eig_v[bl_cyclic_index].imag();
+                // msg->data[i*num_loc_cols + j].re = diagData->eig_v[bl_cyclic_index].real();
+                // msg->data[i*num_loc_cols + j].im = diagData->eig_v[bl_cyclic_index].imag();
+                int global_row = glob_start_row + i;
+                int global_col = glob_start_col + j;
+                // if (global_col == 0)
+                CkPrintf("[CopyFrom] diag-pe %d (%dx%d) inputsize %d (%dx%d) local_r/c %d %d bl %d r/c %d %d global_rc %d %d val %.8e\n", 
+                                         mype, pe_row, pe_col, 
+                                         totaldata, row_size, col_size, 
+                                         idx_row, idx_col, 
+                                         bl_cyclic_index, 
+                                         i, j, 
+                                         global_row, global_col,
+                                         diagData->eig_v[bl_cyclic_index].real());
+              }
+              msg->eigenvalues[j].re = diagData->eig_e[glob_start_col+j].real();
+              msg->eigenvalues[j].im = diagData->eig_e[glob_start_col+j].imag();
+            }
+            msg = smatrix_proxy(eps_row_idx, eps_col_idx).sendDataSimple(msg);
+            // delete msg;
+            // CkPrintf("pe %d inputsize %d tile r/c %d/%d block %dx%d start %d\n", mype, totaldata, idx_row, idx_col, num_loc_rows, num_loc_cols, start_index);
+          //  } 
+          } // end for tile_col
+        } // end for tile_row
+        
         delete [] diagData->input;
         delete [] diagData->eig_e;
         delete [] diagData->eig_v;
         delete diagData;
-      }
-    }
+        contribute(CkCallback(CkReductionTarget(Controller, mpi_received_complete), controller_proxy));
+      } // end serial
+    } // end copyFrom MPI
+    
   }; // end group DiagBridge
   
 

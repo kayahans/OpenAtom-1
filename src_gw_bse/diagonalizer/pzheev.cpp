@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <complex>
+#include <cstring> // for memcpy
 //header file from Charm needed for Interoperation
 #include "mpi-interoperate.h"
 #include "diagonalizer.h"
@@ -13,7 +14,7 @@ extern "C" {
   void Cblacs_get(int context, int request, int* value);
   int Cblacs_gridinit(int* context, const char * order, int np_row, int np_col);
   void Cblacs_gridinfo(int context, int* np_row, int* np_col, int* my_row, int* my_col);
-  void Cblacs_gridexit(int context);
+  void Cblacs_gridexit(int* context);
   void Cblacs_exit(int error_code);
 
 // SCALAPACK
@@ -144,7 +145,8 @@ int main(int argc, char **argv){
           }
       }
     }
-
+    diagData->pe_row = myrow;
+    diagData->pe_col = mycol;
     int itemp = max(1, mpA);
     descinit_(descA,  &n, &n, &nb, &nb,
       &izero, &izero, &ictxt, &itemp, &info);
@@ -174,7 +176,7 @@ int main(int argc, char **argv){
     // printf("Work size on proc %dx%d: %d\n", myrow,mycol, lwork);
     free(work);
     work = (std::complex<double> *)calloc(lwork, sizeof(std::complex<double>));
-    if (work == NULL) { printf("error of memory allocation work "
+    if (work == NULL) { printf("error of memory allocation work (2nd time)"
       "on proc %dx%d\n",myrow,mycol); exit(0);}
 
     // Resize rwork array 
@@ -182,7 +184,7 @@ int main(int argc, char **argv){
     // printf("Rwork size on proc %dx%d: %d\n", myrow,mycol, lrwork);
     free(rwork);
     rwork = (double *)calloc(lrwork, sizeof(double));
-    if (rwork == NULL) { printf("error of memory allocation rwork "
+    if (rwork == NULL) { printf("error of memory allocation rwork (2nd time)"
       "on proc %dx%d\n",myrow,mycol); exit(0);}
 
     MPIt1 = MPI_Wtime();
@@ -193,25 +195,47 @@ int main(int argc, char **argv){
     MPIt2 = MPI_Wtime();
     MPIelapsed = MPIt2 - MPIt1;
 
-    if (iam == 1) {
-      int looptot = mpA * nqA;
-      // diagData->eig_v = new double[looptot];
-      // for (i = 0; i < mpA; i++) {
-      //     for (j = 0; j < nqA; j++) {
-      //         // diagData->eig_v[(i*nqA)+j] = Z[(i*nqA)+j];
-      //         printf("[DIAGONALIZER] eig_v (%d,%d) %.8e %d, %d, %d\n",
-      //           i, j, Z[(i*nqA)+j].real(), myrow+1, mycol+1, iam);
-      //     }
-      // }
-      // diagData->eig_e = new double[mpA];
-      for (int i = 0; i < min_mn; i++) {
-        // diagData->eig_e[i] = A[i];
-        printf("[DIAGONALIZER] eig_e %.8e %f %d, %d, %d\n",
-          i, W[i], myrow+1, mycol+1, iam);
-      }
-      printf("n=%d\t(%d,%d)\t%d\tjobz=%c\t%8.2fs \n",
-        n, nprow, npcol, nb, jobz, MPIelapsed);
-    }
+    
+    int looptot = mpA * nqA;
+    diagData->eig_v = new std::complex<double>[looptot];
+    std::memcpy(diagData->eig_v, Z, looptot*sizeof(std::complex<double>));
+    
+    // for (int i = 0; i < mpA; i++) {
+        // for (int j = 0; j < nqA; j++) {
+            // diagData->eig_v[(i*nqA)+j] = Z[(i*nqA)+j];
+            
+            // printf("[DIAGONALIZER] pe %d eig_v (%d,%d) %.8e %d, %d\n",
+            //   iam, i, j, Z[(i*nqA)+j].real(), myrow+1, mycol+1);
+        // }
+    // }
+    
+    //   for (int j = 0; j < nqA; j++) {
+    //     for (int i = 0; i < mpA; i++) {
+    //         // diagData->eig_v[(i*nqA)+j] = Z[(i*nqA)+j];
+    //         int global_tile_row = i / 20 + myrow;
+    //         int global_tile_col = j / 20 + mycol;
+    //         int global_row = i + global_tile_row * 20;
+    //         int global_col = j + global_tile_col * 20;
+    //         if (global_col == 0) {
+    //           printf("[DIAGONALIZER] pe %d eig_v (%d,%d) global (%d, %d) idx %d %.8e %d, %d\n",
+    //           iam, i, j, global_row, global_col, j, Z[(j*mpA)+i].real(), myrow+1, mycol+1);
+    //         }
+              
+    //     }
+    // }
+    diagData->eig_e = new std::complex<double>[min_mn];
+    std::memcpy(diagData->eig_e, A, min_mn*sizeof(std::complex<double>));
+    // if (iam == 0) {
+    //   for (int i = 0; i < min_mn; i++) {
+    //     // diagData->eig_e[i] = A[i];
+    //     printf("[DIAGONALIZER] eig_e %d %.8e %d, %d, %d\n",
+    //       i, W[i], myrow+1, mycol+1, iam);
+    //   }
+    // }
+
+    printf("n=%d\t(%d,%d)\t%d\tjobz=%c\t%8.2fs \n",
+      n, nprow, npcol, nb, jobz, MPIelapsed);
+    
     free(work);
     free(rwork);
     free(W);
@@ -226,6 +250,7 @@ int main(int argc, char **argv){
 
   CharmLibExit();
   MPI_Barrier(MPI_COMM_WORLD);
+  Cblacs_gridexit(&ictxt);
   MPI_Finalize();
 
   return 0;  

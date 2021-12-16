@@ -107,6 +107,7 @@ class Controller : public CBase_Controller {
     int max_local_inew;
     int padded_epsilon_size;
     int real_epsilon_size;
+    int sigma_mode;
     double prev_max;
     int *n_list, *np_list;
     std::vector<int> accept_result;

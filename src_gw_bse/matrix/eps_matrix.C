@@ -156,6 +156,49 @@ void EpsMatrix::screenedExchange() {
   delete[] contrib_data;
 }
 
+void EpsMatrix::screenedExchangeGPP() {
+  // TODO (kayahans) will be modified, for now just copy/paste from static
+  FVectorCache* f_cache = fvector_cache_proxy.ckLocalBranch();
+  int n = f_cache->getNSize();
+  int tuple_size = K*n;
+  tuple_size += 1;
+  CkReduction::tupleElement *tuple_reduction;
+  tuple_reduction = new CkReduction::tupleElement[tuple_size];
+  complex total_contribution(0.0,0.0);
+  complex *contrib_data;
+  contrib_data = new complex[tuple_size];
+  int ik = 0;
+
+  for (int k = 0; k < K; k++) {
+    for (int i = 0; i < f_cache->getNSize(); i++) {
+        complex contribution(0.0,0.0);
+  //      for (int j = 0; j < f_cache->getNSize(); j++) { //Performs only <n|Sigma|n> as does the fortran code
+  // Uncommenting above loop will perform <n|Sigma|n’>
+        for (int l = 0; l < L; l++) {
+          complex* fi = f_cache->getFVec(k, i, l, thisIndex.x, eps_rows);
+          complex* fj = f_cache->getFVec(k, i, l, thisIndex.y, eps_cols);
+          for (int r = 0; r < config.tile_rows; r++) {
+            for (int c = 0; c < config.tile_cols; c++) {
+              contribution += fi[r]*fj[c].conj()*data[IDX_eps(r,c)];
+            }
+          }
+        }
+        contrib_data[ik] = contribution * -1.0;
+        tuple_reduction[ik] =  CkReduction::tupleElement(sizeof(complex), &(contrib_data[ik]), CkReduction::sum_double);
+        ik++;
+        total_contribution += contribution * -1.0;
+    }
+  }
+
+  tuple_reduction[ik] =  CkReduction::tupleElement(sizeof(complex), &total_contribution, CkReduction::sum_double);
+
+  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tuple_reduction, tuple_size);
+  msg->setCallback(CkCallback(CkIndex_Controller::screenedExchangeComplete(NULL), controller_proxy));
+  contribute(msg);
+  delete[] contrib_data;
+}
+
+
 void EpsMatrix::bareExchange() {
   complex total_contribution = (0.0,0.0);
   FVectorCache* f_cache = fvector_cache_proxy.ckLocalBranch();
@@ -506,12 +549,91 @@ DiagMessage* EpsMatrix::receiveDataSimple(DiagMessage* msg) {
       idx_col = start_col + c;
       
       // CHARM++ data is row-major
-      msg->data[i].real(data[r*config.tile_cols + c].re);
-      msg->data[i].imag(data[r*config.tile_cols + c].im);
+      msg->data[i] = data[r*config.tile_cols + c];
+      // msg->data[i].imag(data[r*config.tile_cols + c].im);
       i++;
     }
   }
   
+  return msg;
+}
+
+void EpsMatrix::print_col(int num) { 
+  int x = thisIndex.x;
+  int y = thisIndex.y;
+  int global_row, global_col;
+  int i = 0;
+  for (int r = 0; r < config.tile_rows; r++) {
+    for (int c = 0; c < config.tile_cols; c++) {
+        global_row = x*config.tile_rows + r;
+        global_col = y*config.tile_cols + c;
+        if ( global_col == num ) {
+          double val = data[c*config.tile_rows + r].re;
+          CkPrintf("[EPSMATRIX] x/y %d %d global_r/c %d %d val %.8e\n", x, y, global_row, global_col, val);
+        }
+      i++;
+    }
+  }
+}
+
+void EpsMatrix::print_row(int num) { 
+  int x = thisIndex.x;
+  int y = thisIndex.y;
+  int global_row, global_col;
+  for (int r = 0; r < config.tile_rows; r++) {
+    for (int c = 0; c < config.tile_cols; c++) {
+        global_row = x*config.tile_rows + r;
+        global_col = y*config.tile_cols + c;
+        if ( global_row == num ) {
+          double val = data[c*config.tile_rows + r].re;
+          CkPrintf("[EPSMATRIX] x/y %d %d global_r/c %d %d val %.8e\n",x, y, global_row, global_col, val);
+        }
+    }
+  }
+}
+
+
+DiagMessage* EpsMatrix::sendDataSimple(DiagMessage* msg) {
+  
+  int msg_cols = msg->cols;
+  int msg_rows = msg->rows;
+  // int eps_local_cols = msg_rows;
+  // int eps_local_rows = msg_cols;
+  int eps_local_cols = msg_cols;
+  int eps_local_rows = msg_rows;
+  
+  int idx_col, idx_row;
+  int i = 0;
+
+  int x = thisIndex.x;
+  int y = thisIndex.y;
+  int global_row, global_col;
+
+  
+  for (int r = 0; r < config.tile_rows ; r++) {
+    for (int c = 0; c < config.tile_cols; c++) {
+        if (r < msg_rows && c < msg_cols) {
+          // data[c*config.tile_rows + r] = msg->data[i];
+          data[r*config.tile_cols + c] = msg->data[c*msg_rows + r];
+          i++;
+        }
+        else {
+          data[r*config.tile_cols + c].re = 0.0;
+          // data[c*config.tile_rows + r] = msg->data[i];
+        }
+        // global_row = x*config.tile_rows + r;
+        // global_col = y*config.tile_cols + c;
+        // // if ( global_row == 17 ) {
+        //   CkPrintf("[DIAGMESSAGE] rc %d %d msg_rc %d %d config_rc %d %d global_rc %d %d start_rc %d %d val %.8e valmsg %.8e\n",
+        //    r, c, 
+        //    msg_rows, msg_cols, 
+        //    config.tile_rows, config.tile_cols,  
+        //    global_row, global_col, 
+        //    start_row, start_col, 
+        //    data[c*config.tile_rows + r].re, msg->data[i-1].re);
+        // // }
+    }
+  }
   return msg;
 }
 

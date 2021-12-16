@@ -23,7 +23,6 @@ module messages {
   };
 
   message DiagMessage;
-  
 };
 
 module states {

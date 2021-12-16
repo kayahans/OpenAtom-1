@@ -521,6 +521,14 @@ void Config::set_config_dict_GW_sigma  (int *num_dict ,DICT_WORD **dict){
   strcpy((*dict)[ind].keyarg,"1");
   strcpy((*dict)[ind].error_mes,"a number > 0 ");
   //-----------------------------------------------------------------------------
+
+  //-----------------------------------------------------------------------------
+  //  5)\sigma_mode{}
+  ind =   5;   
+  strcpy((*dict)[ind].keyword,"sigma_mode");
+  strcpy((*dict)[ind].keyarg,"0");
+  strcpy((*dict)[ind].error_mes,"an integer");
+  //-----------------------------------------------------------------------------
 }//end routine
 //===================================================================================
 
@@ -1041,18 +1049,25 @@ void Config::set_config_params_GW_sigma  (DICT_WORD *dict, char *fun_key, char *
 
 
   //-----------------------------------------------------------------------------
-  //  4)\screened_coulomb_cutoff{}
-  ind =   4;   
+  //  3)\screened_coulomb_cutoff{}
+  ind =  3 ;   
   sscanf(dict[ind].keyarg,"%lg",&real_arg);
   if (real_arg<0){keyarg_barf(dict,input_name,fun_key,ind);}  
   gw_sigma->screened_coulomb_cutoff = real_arg;
 
   //-----------------------------------------------------------------------------
-  //  5)\bare_coulomb_cutoff{}
-  ind =   5;   
+  //  4)\bare_coulomb_cutoff{}
+  ind =   4;   
   sscanf(dict[ind].keyarg,"%lg",&real_arg);
   if (real_arg<0){keyarg_barf(dict,input_name,fun_key,ind);}  
   gw_sigma->bare_coulomb_cutoff = real_arg;
+
+   //-----------------------------------------------------------------------------
+  //  5)\sigma_mode{}
+  ind =   5;   
+  sscanf(dict[ind].keyarg,"%d",&int_arg);
+  if (int_arg<0){keyarg_barf(dict,input_name,fun_key,ind);}
+  gw_sigma->sigma_mode = int_arg; 
   //----------------------------------------------------------------------------- 
 }// end routine
 //================================================================================

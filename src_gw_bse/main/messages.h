@@ -56,12 +56,13 @@ class Phase4Message : public CMessage_Phase3Message {
 class DiagMessage : public CMessage_DiagMessage {
   public:
   // TODO (kayahans): Using fixed size messages (simpler) 
-  //                  400 is 20 x 20 that is eps_cols x eps_rows
-  //                  global variables
-
+  //                  400 is 20 x 20 that is eps_cols x eps_rows (global variables)
+  //                  In any way, the actual data transferred will be either
+  //                  equal to or smaller than this, later here can be generalized
     DiagMessage() {
     }
-    std::complex<double> data[400];
+    complex data[400];
+    complex eigenvalues[20];
     int size;
     int eps_size;
     int x;
@@ -69,5 +70,6 @@ class DiagMessage : public CMessage_DiagMessage {
     int eps_pe;
     int rows;
     int cols;
+    
 };
 #endif

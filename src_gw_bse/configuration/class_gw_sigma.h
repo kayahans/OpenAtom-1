@@ -21,10 +21,13 @@ class GW_SIGMA{
     char nnpFileName[200];       // No need to pup this, contents stored in next three variables
     int num_sig_matels;  // number of <n|Sigma|n'> elements to calculate in GW
     int *n_list_sig_matels, *np_list_sig_matels;  // n an n' lists
-
+    
     double screened_coulomb_cutoff;     // Num: Cutoff for screened coulomb term (must be less than Ecuteps (eV)
     double bare_coulomb_cutoff;         // Num: cutoff for bare coulomb (eV)
 
+    int sigma_mode;  // 0 for static sigma calculation
+                     // 1 for GPP 
+    
     //----------------
     //con-destruct:
     GW_SIGMA(){
@@ -34,6 +37,7 @@ class GW_SIGMA{
       num_sig_matels = 0;
       n_list_sig_matels = 0;
       np_list_sig_matels = 0;
+      sigma_mode = -1;
     };
     ~GW_SIGMA(){};
 
@@ -47,7 +51,8 @@ class GW_SIGMA{
       p | num_sig_matels;
       //puppting dbles
       p | screened_coulomb_cutoff;
-      p | bare_coulomb_cutoff;      
+      p | bare_coulomb_cutoff;
+      p | sigma_mode;
       if(p.isUnpacking()) {
 	        n_list_sig_matels = new int [num_sig_matels];
 	        np_list_sig_matels = new int [num_sig_matels];
@@ -75,6 +80,7 @@ class GW_SIGMA{
       //dbles
       fprintf(fp,"screened_coulomb_cutoff %lg\n",screened_coulomb_cutoff);
       fprintf(fp,"bare_coulomb_cutoff %lg\n",bare_coulomb_cutoff);
+      fprintf(fp,"sigma_mode %d\n",sigma_mode);
       fclose(fp);
     }// end routine
     

@@ -35,6 +35,8 @@ class EpsMatrix : public CBase_EpsMatrix {
     CLA_Matrix_interface matrix;
     unsigned int blockSize, numBlocks, block;
 
+    bool has_eigenvalues = false;
+    std::vector<complex> eigenvalues;
   public:
     EpsMatrix();
     EpsMatrix(MatrixConfig config);
@@ -52,17 +54,21 @@ class EpsMatrix : public CBase_EpsMatrix {
     void round_done(void);
     void findAlpha(void);
     void screenedExchange();
+    void screenedExchangeGPP();
     void bareExchange();
     void coh();
     void scalar_multiply(double alpha);
     void convergence_check(CProxy_EpsMatrix cmp_proxy);
     void add_compl_two();
     void multiply_coulb();
+    void print_col(int num);
+    void print_row(int num);
     void createCopy(CProxy_EpsMatrix other, bool todo);
     void recvCopy(std::vector<complex> new_data);
     void setI(CLA_Matrix_interface mat, bool clean);
     void receiveConvCheck(std::vector<complex> incoming);
     DiagMessage* receiveDataSimple(DiagMessage* msg);
+    DiagMessage* sendDataSimple(DiagMessage* msg);
     static void done_cb(void *obj){
      ((EpsMatrix*) obj)->round_done();
     }

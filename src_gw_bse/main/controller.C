@@ -36,6 +36,7 @@ Controller::Controller() {
   else
     Q = gwbse->gw_parallel.Q;
 
+  sigma_mode = gw_sigma->sigma_mode;
   Bands = gw_sigma->num_sig_matels;
 
   bare_x_final = new complex*[K];

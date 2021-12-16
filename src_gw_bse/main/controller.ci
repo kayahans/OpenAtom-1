@@ -70,6 +70,7 @@ module controller {
     entry [reductiontarget] void cohComplete(CkReductionMsg* msg);
     entry [reductiontarget] void diag_setup();
     entry [reductiontarget] void mpi_copy_complete();
+    entry [reductiontarget] void mpi_received_complete();
     entry [reductiontarget] void gpp_complete();
     entry [reductiontarget] void readComplete(bool success);
     entry [reductiontarget] void writeComplete(bool success);
@@ -384,35 +385,61 @@ module controller {
       when copy_complete() serial {
         s_matrix2D_proxy.multiply_coulb();
       }
-      // Print S-matrix to verify (start)
-      serial {
-        matrixCopy(s_matrix2D_proxy, s_matrix1D_proxy, copyCB);
+      if (sigma_mode == 0) {
+        when s_ready () serial {
+          CkPrintf("[CONTROLLER] Phase-4 Bare Exchange, Static Screen Exchange and COH computation (sigma_mode = 0)\n");
+          CkPrintf("| Type               | K | n | n' |     Sigma       \n");
+          bare_x = screen_x = coh = (0.0,0.0);
+        }
       }
-      when copyComplete(bool success) {}
-      serial {
-        std::string filename = "data/Smatrix_q" + std::to_string(qindex);
-        matrixWrite(s_matrix1D_proxy, filename, writeCB);
-      }
-      // Print S-matrix to verify (end)
+      else if (sigma_mode == 1) {
+        // Print S-matrix to verify (start)
+        serial {
+          matrixCopy(s_matrix2D_proxy, s_matrix1D_proxy, copyCB);
+        }
+        when copyComplete(bool success) {}
+        serial {
+          std::string filename = "data/Smatrix_q" + std::to_string(qindex);
+          matrixWrite(s_matrix1D_proxy, filename, writeCB);
+        }
+        // Print S-matrix to verify (end)
 
-      when s_ready() serial {
-        CkPrintf("[CONTROLLER] Prepare transferring data to MPI\n");
-        diag_bridge_proxy.prepareData(qindex, real_epsilon_size, qpts);
+        when s_ready() serial {
+          CkPrintf("[CONTROLLER] Prepare transferring data to MPI\n");
+          diag_bridge_proxy.prepareData(qindex, real_epsilon_size, qpts);
+        }
+        when diag_setup() serial {
+          CkPrintf("[CONTROLLER] Transfer data to MPI\n");
+          diag_bridge_proxy.copyToMPI(qindex, real_epsilon_size, s_matrix2D_proxy);
+        }
+        when mpi_copy_complete() serial {
+          CkPrintf("[CONTROLLER] Transfer to MPI is complete\n");
+          mainProxy.done();
+        }
+        when gpp_complete() serial {
+          diag_bridge_proxy.copyFromMPI(qindex, real_epsilon_size, s_matrix2D_proxy);
+        }
+        when mpi_received_complete () serial {
+          CkPrintf("[CONTROLLER] Phase-4 Bare Exchange, Screen Exchange and COH computation with GPP (sigma_mode = 1)\n");
+          CkPrintf("| Type               | K | n | n' |     Sigma       \n");
+          bare_x = screen_x = coh = (0.0,0.0);
+        }
       }
-      when diag_setup() serial {
-        CkPrintf("[CONTROLLER] Transfer data to MPI\n");
-        diag_bridge_proxy.copyToMPI(qindex, real_epsilon_size, s_matrix2D_proxy);
-      }
-      when mpi_copy_complete() serial {
-        CkPrintf("Transfer to MPI is complete\n");
-        mainProxy.done();
-      }
-      when gpp_complete() serial {
-        CkPrintf("[CONTROLLER] Phase-4 Bare Exchange, Screen Exchange and COH computation\n");
-        CkPrintf("| Type               | K | n | n' |     Sigma       \n");
-        bare_x = screen_x = coh = (0.0,0.0);
-        diag_bridge_proxy.copyFromMPI(qindex, real_epsilon_size, s_matrix2D_proxy);
-      }
+      // Print S-matrix to verify (start)
+      // when mpi_received_complete() serial {
+      //   // int row = 17;
+      //   // s_matrix2D_proxy.print_row(row);
+      //   matrixCopy(s_matrix2D_proxy, s_matrix1D_proxy, copyCB);
+      //   // CkPrintf("[CONTROLLER] Writing S-matrix eigenvectors to file\n");
+      //   // std::string filename = "data/Smatrix_eigv_q" + std::to_string(qindex);
+      //   // matrixWrite(s_matrix1D_proxy, filename, writeCB);
+      // }
+      // when copyComplete(bool success) serial {
+      //   CkPrintf("[CONTROLLER] Writing S-matrix eigenvectors to file\n");
+      //   std::string filename = "data/Smatrix_eigv_q" + std::to_string(qindex);
+      //   matrixWrite(s_matrix1D_proxy, filename, writeCB);
+      // }
+      // Print S-matrix to verify (end)
 
       for (next_K = 0; next_K < K; next_K++) {
 //send occ and unocc states in bandlist
@@ -444,7 +471,11 @@ module controller {
           }
         }
         delete msg;
-        s_matrix2D_proxy.screenedExchange();
+        if (sigma_mode == 0) 
+          s_matrix2D_proxy.screenedExchange();
+        else if (sigma_mode == 1)
+          s_matrix2D_proxy.screenedExchangeGPP();
+
       }
 
       when screenedExchangeComplete(CkReductionMsg* msg) serial {
