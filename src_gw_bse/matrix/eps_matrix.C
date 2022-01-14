@@ -7,10 +7,12 @@
 #include "states.h"
 #include "fft_routines.h"
 #include "fft_controller.h"
+#include "gpp.h"
 #include "../diagonalizer/diagonalizer.h"
 
 #include <cstring> // for memcpy
 using std::memcpy;
+#include <cmath>
 
 extern diagData_t* diagData;
 
@@ -196,6 +198,129 @@ void EpsMatrix::screenedExchangeGPP() {
   msg->setCallback(CkCallback(CkIndex_Controller::screenedExchangeComplete(NULL), controller_proxy));
   contribute(msg);
   delete[] contrib_data;
+}
+
+void EpsMatrix::cohGPP(){
+
+  FVectorCache* f_cache = fvector_cache_proxy.ckLocalBranch();
+  PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
+  FFTController* fft_controller = fft_controller_proxy.ckLocalBranch();
+
+  complex* states = psi_cache->getStates();
+  int psi_size = nfft[0]*nfft[1]*nfft[2];
+  std::vector<int> accept_v = f_cache->getAcceptVector();
+
+  int ga[psi_size];
+  int gb[psi_size];
+  int gc[psi_size];
+  fftidx_to_gidx(ga,gb,gc,nfft);
+
+  int n = f_cache->getNSize();
+  int tuple_size = K*n;
+  tuple_size += 1;
+  CkReduction::tupleElement *tuple_reduction;
+  tuple_reduction = new CkReduction::tupleElement[tuple_size];
+  complex *contrib_data;
+  contrib_data = new complex[tuple_size];
+  int ik = 0;
+  complex total_contribution = (0.0,0.0);
+
+  GWBSE *gwbse = GWBSE::get();
+  int* nfft;
+  nfft = gwbse->gw_parallel.fft_nelems;
+  GW_SIGMA *gw_sigma = &(gwbse->gw_sigma);
+  int n_np = gw_sigma->num_sig_matels;
+  int *n_list = gw_sigma->n_list_sig_matels;
+  int *np_list = gw_sigma->np_list_sig_matels;
+
+  complex *f = new complex[n_np*psi_size];
+  std::vector<int> map(psi_size);
+  for (int k = 0; k < K; k++) {
+    int epsilon_size = 0;
+
+    for(int g=0;g<psi_size;g++){
+      if(accept_v[g]){
+        map[epsilon_size] = g;
+        epsilon_size++;
+      }
+    }
+    map.resize(epsilon_size);
+
+    int base_index = k*2*n*psi_size;
+
+
+//This could probably be done once per node and cached
+    for (int i = 0; i < f_cache->getNSize(); i++){
+      int i_index = n_list[i]-1;
+      int j_index = np_list[i]-1;
+
+      int state_index = i*2*psi_size;
+      int f_base = i*psi_size;
+
+      for(int g=0; g < psi_size; g++){
+        f[f_base+g] = states[base_index + state_index + g].conj() * states[base_index + state_index + g];
+      }
+
+
+      fft_controller->setup_fftw_3d(nfft, -1);
+      fftw_complex* in_pointer = fft_controller->get_in_pointer();
+      fftw_complex* out_pointer = fft_controller->get_out_pointer();
+      // Pack our data, do the fft, then get the output
+      put_into_fftbox(nfft, &f[f_base], in_pointer);
+      fft_controller->do_fftw();
+      fftbox_to_array(psi_size, out_pointer, &f[f_base], 1);
+    }
+
+    for (int i = 0; i < f_cache->getNSize(); i++) {
+      int f_base = i*psi_size;
+      complex contribution = (0.0,0.0);
+      for (int r = 0; r < config.tile_rows; r++) {
+        int g1 = thisIndex.x*eps_rows+r;
+        for (int c = 0; c < config.tile_cols; c++) {
+          int g2 = thisIndex.y*eps_cols+c;
+          if(g1>=epsilon_size || g2>=epsilon_size) continue;
+
+          int gdiff[3];
+          gdiff[0] = ga[map[g1]]-ga[map[g2]];
+          gdiff[1] = gb[map[g1]]-gb[map[g2]];
+          gdiff[2] = gc[map[g1]]-gc[map[g2]];
+          // flip the value and
+          // set back to gdiff values
+
+          for (int ii=0; ii<3; ii++){
+            if (gdiff[ii] < -nfft[ii]/2){
+              gdiff[ii] += nfft[ii];
+            }
+            if (gdiff[ii] >= nfft[ii]/2){
+              gdiff[ii] -= nfft[ii]/2;
+            }
+          }
+
+          int gdiffIndex = -1;
+          for (int ii=0; ii<psi_size; ii++){
+            if (gdiff[0]==ga[ii] && gdiff[1]==gb[ii] && gdiff[2]==gc[ii]){
+              gdiffIndex = ii;
+              break;
+            }
+          }
+
+          contribution += f[f_base+gdiffIndex]*data[IDX_eps(r,c)];
+        }
+      }
+      contrib_data[ik] = contribution;
+      tuple_reduction[ik] =  CkReduction::tupleElement(sizeof(complex), &(contrib_data[ik]), CkReduction::sum_double);
+      ik++;
+      total_contribution += contribution;
+    }
+  } //end of K loop
+
+  tuple_reduction[ik] =  CkReduction::tupleElement(sizeof(complex), &total_contribution, CkReduction::sum_double);
+
+  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tuple_reduction, tuple_size);
+  msg->setCallback(CkCallback(CkIndex_Controller::cohComplete(NULL), controller_proxy));
+  contribute(msg);
+  delete[] contrib_data;
+  delete[] f;
 }
 
 
@@ -438,6 +563,16 @@ void EpsMatrix::receiveTranspose(std::vector<complex> new_data) {
   contribute(CkCallback(CkReductionTarget(Controller, transpose_complete), controller_proxy));
 }
 
+void EpsMatrix::transferToGpp(CProxy_Gpp other, bool todo) {
+  std::vector<complex> incoming;
+  for(int i=0; i < config.tile_rows; i++) {
+    for(int j=0; j < config.tile_cols; j++) {
+        incoming.push_back(data[IDX_eps(i,j)]);
+    }
+  }
+    other(thisIndex.x, thisIndex.y).recvCopy(incoming);
+}
+
 void EpsMatrix::createCopy(CProxy_EpsMatrix other, bool todo) {
   std::vector<complex> incoming;
   for(int i=0; i < config.tile_rows; i++) {
@@ -496,67 +631,6 @@ void EpsMatrix::multiply_coulb(){
   contribute(CkCallback(CkReductionTarget(Controller, s_ready), controller_proxy));
 }
 
-DiagMessage* EpsMatrix::receiveDataSimple(DiagMessage* msg) {
-  msg->eps_pe = CkMyPe();
-  msg->x = thisIndex.x;
-  msg->y = thisIndex.y;
-
-  bool borderX = false;
-  bool borderY = false;
-  if (thisIndex.x + 1 == numBlocks) {
-    borderX = true;
-  }
-  if (thisIndex.y + 1 == numBlocks) {
-    borderY = true;
-  }
-  int real_epsilon_size = msg->eps_size;
-  unsigned int dataSize = 0;
-  int remElems2 = real_epsilon_size % eps_rows;  // eps_rows = eps_col square matrix
-  int stdElems = eps_rows * eps_cols;
-  int remElems = remElems2 * eps_rows;
-  int cornerElems = remElems2 * remElems2;
-
-  int rows = 0;
-  int cols = 0;
-  if (borderX && !borderY) {
-    dataSize = remElems;
-    rows = remElems2;
-    cols = eps_rows;
-  } else if (!borderX && borderY) {
-    dataSize = remElems;
-    rows = eps_rows;
-    cols = remElems2;
-  } else if (borderX && borderY) {
-    dataSize = cornerElems;
-    rows = remElems2;
-    cols = remElems2;
-  } else {
-    dataSize = stdElems;
-    rows = eps_rows;
-    cols = eps_rows;
-  }
-  msg->size = dataSize;
-  msg->rows = rows;
-  msg->cols = cols;
-
-  int idx_col, idx_row;
-  int i = 0;
-
-  // Transfer data to column major
-  for (int c = 0; c < cols; c++) {
-    for (int r = 0; r < rows; r++) {
-      idx_row = start_row + r;
-      idx_col = start_col + c;
-      
-      // CHARM++ data is row-major
-      msg->data[i] = data[r*config.tile_cols + c];
-      // msg->data[i].imag(data[r*config.tile_cols + c].im);
-      i++;
-    }
-  }
-  
-  return msg;
-}
 
 void EpsMatrix::print_col(int num) { 
   int x = thisIndex.x;
@@ -592,167 +666,6 @@ void EpsMatrix::print_row(int num) {
   }
 }
 
-
-DiagMessage* EpsMatrix::sendDataSimple(DiagMessage* msg) {
-  
-  int msg_cols = msg->cols;
-  int msg_rows = msg->rows;
-  // int eps_local_cols = msg_rows;
-  // int eps_local_rows = msg_cols;
-  int eps_local_cols = msg_cols;
-  int eps_local_rows = msg_rows;
-  
-  int idx_col, idx_row;
-  int i = 0;
-
-  int x = thisIndex.x;
-  int y = thisIndex.y;
-  int global_row, global_col;
-
-  
-  for (int r = 0; r < config.tile_rows ; r++) {
-    for (int c = 0; c < config.tile_cols; c++) {
-        if (r < msg_rows && c < msg_cols) {
-          // data[c*config.tile_rows + r] = msg->data[i];
-          data[r*config.tile_cols + c] = msg->data[c*msg_rows + r];
-          i++;
-        }
-        else {
-          data[r*config.tile_cols + c].re = 0.0;
-          // data[c*config.tile_rows + r] = msg->data[i];
-        }
-        // global_row = x*config.tile_rows + r;
-        // global_col = y*config.tile_cols + c;
-        // // if ( global_row == 17 ) {
-        //   CkPrintf("[DIAGMESSAGE] rc %d %d msg_rc %d %d config_rc %d %d global_rc %d %d start_rc %d %d val %.8e valmsg %.8e\n",
-        //    r, c, 
-        //    msg_rows, msg_cols, 
-        //    config.tile_rows, config.tile_cols,  
-        //    global_row, global_col, 
-        //    start_row, start_col, 
-        //    data[c*config.tile_rows + r].re, msg->data[i-1].re);
-        // // }
-    }
-  }
-  return msg;
-}
-
-void DiagBridge::prepareData(int qindex, int eps_size, int num_qpts) {
-  // This routine sets up the containers (diagData) for each element of process grid
-  // 2D Block cyclic mapping
-  // https://www.netlib.org/scalapack/slug/node76.html, Fig. 4.6
-  // Blocks are square and block sizes are equal to EpsMatrix tile size in charm++
-  // eps_size: rank of the matrix for an N x N invertable matrix size is N
-  // qindex: q index of the epsilon. Not really needed here, but used in debugging
-
-  int mype = CkMyPe();
-  
-  // Possible Charm++ tile sizes 
-  int remElems2 = eps_size % eps_rows;  
-  int stdElems = eps_rows * eps_rows; // square matrix 
-  int remElems = remElems2 * eps_rows; // sides of eps
-  int cornerElems = remElems2 * remElems2; // corner of eps
-
-  // Proc distribution to be used for diagonalization
-  GWBSE* gwbse = GWBSE::get();
-  // TODO (kayahans): read from input
-  proc_rows = 2; // gwbse->gw_parallel.proc_rows;
-  proc_cols = 2; // gwbse->gw_parallel.proc_cols;
-
-  // Number of blocks
-  numBlocks = eps_size / eps_rows + 1;
-  // Eps is a square matrix
-  int numx = numBlocks;
-  int numy = numBlocks;
-
-  // Dimensions of the matrix stored on process grid
-  row_size = 0;
-  col_size = 0;
-  totaldata = 0; // totaldata = row_size * col_size
-
-  // These are used to count the number of charm++ tiles in a process grid block
-  int x_prev = -1;
-  int y_prev = -1;
-  int x_num_tiles = 0; // num of charm++ tiles in row dimension
-  int y_num_tiles = 0; // num of charm++ tiles in col dimension
-
-  
-  for (int x=0; x < numx; x++) {
-    for (int y=0; y < numy; y++) {
-      int dest_pe_row = x%proc_rows;
-      int dest_pe_col = y%proc_cols;
-      int dest_pe = dest_pe_row*proc_cols + dest_pe_col;
-
-      if (dest_pe == mype) {
-        if (x > x_prev) {
-          x_prev = x;
-          x_num_tiles += 1;
-        }
-        if (y > y_prev) {
-          y_prev = y;
-          y_num_tiles +=1;
-        }
-        bool borderX = false;
-        bool borderY = false;
-        if (x + 1 == numBlocks) {
-          borderX = true;
-        }
-
-        if (y + 1 == numBlocks) {
-          borderY = true;
-        }
-
-        int xy_datasize = 0;
-        int rows = 0;
-        int cols = 0;
-        if (borderX && !borderY) {
-          xy_datasize = remElems;
-          rows = remElems2;
-          cols = eps_rows;
-        } else if (!borderX && borderY) {
-          xy_datasize = remElems;
-          rows = eps_rows;
-          cols = remElems2;
-        } else if (borderX && borderY) {
-          xy_datasize = cornerElems;
-          rows = remElems2;
-          cols = remElems2;
-        } else {
-          xy_datasize = stdElems;
-          rows = eps_rows;
-          cols = eps_rows;
-        }
-        totaldata += xy_datasize;
-        row_size  += rows;
-        col_size  += cols;
-      } // end if
-    } // end for
-  } // end for
-
-  row_size = row_size / y_num_tiles;
-  col_size = col_size / x_num_tiles;
-
-  // Setup the container to be transferred to MPI
-  diagData = new diagData_t;
-  diagData->qindex = qindex;
-  diagData->num_handoffs = num_qpts;
-  
-  diagData->inputsize = totaldata; 
-  diagData->row_size = row_size;
-  diagData->col_size = col_size;
-  diagData->nprow = proc_rows;
-  diagData->npcol = proc_cols;
-  diagData->nb = eps_rows;
-  diagData->n = eps_size;
-
-  diagData->input = new std::complex<double>[totaldata];
-  // TODO (kayahans): Not sure which pe gets the final result, for now allocate this in all 
-  // Later when we decide how to distribute eigenvectors/values, we can make this smarter
-  diagData->eig_e = new std::complex<double>[eps_size];
-  diagData->eig_v = new std::complex<double>[eps_size*eps_size];  
-  CkPrintf("[DIAGONALIZER] Created a pointer with totalsize %d numblocks %d for S matrix global dim %d at pe %d for qindex %d\n", totaldata, numBlocks, eps_size, CkMyPe(), qindex);
-  contribute(CkCallback(CkReductionTarget(Controller, diag_setup), controller_proxy));
-}
 
 
 #include "eps_matrix.def.h"

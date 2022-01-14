@@ -7,6 +7,7 @@ module controller {
   extern module pmatrix;
   extern module mat_mul;
   extern module main;
+  extern module gpp;
   readonly CProxy_Main mainProxy;
   readonly CProxy_Controller controller_proxy;
 
@@ -56,6 +57,7 @@ module controller {
     entry [reductiontarget] void copyComplete(bool success);
     entry [reductiontarget] void transpose_complete();
     entry [reductiontarget] void copy_complete();
+    entry [reductiontarget] void eps_to_gpp_complete();
     entry [reductiontarget] void s_ready();
     entry [reductiontarget] void m_multiplied();
     entry [reductiontarget] void conjugateComplete();
@@ -78,6 +80,7 @@ module controller {
     entry void PMatrixFormed();
     entry void EpsilonFormed();
     entry void EpsilonInverted();
+    entry void GppFormed();
 
     entry void reportFTime(CkReductionMsg*);
     entry void reportPTime(CkReductionMsg*);
@@ -229,7 +232,13 @@ module controller {
 
         s_matrix2D_proxy = CProxy_EpsMatrix::ckNew(
             cfg2D, opts);
-
+        
+        if (sigma_mode == 1) {
+          gpp2D_proxy = CProxy_Gpp::ckNew(
+            cfg2D, opts);
+          gpp2D_proxy.setQIndex(qindex);
+        }
+        
         MatrixConfig cfg1D = convertTo1D(cfg2D, eps_rows);
         eps_matrix1D_proxy = CProxy_EpsMatrix::ckNew(
             cfg1D, cfg1D.chareRows(), cfg1D.chareCols());
@@ -385,46 +394,21 @@ module controller {
       when copy_complete() serial {
         s_matrix2D_proxy.multiply_coulb();
       }
-      if (sigma_mode == 0) {
-        when s_ready () serial {
+      when s_ready() serial {
+        if (sigma_mode == 0) {
           CkPrintf("[CONTROLLER] Phase-4 Bare Exchange, Static Screen Exchange and COH computation (sigma_mode = 0)\n");
           CkPrintf("| Type               | K | n | n' |     Sigma       \n");
           bare_x = screen_x = coh = (0.0,0.0);
+        } else if (sigma_mode == 1) {
+          thisProxy.formGpp();
         }
       }
-      else if (sigma_mode == 1) {
-        // Print S-matrix to verify (start)
-        serial {
-          matrixCopy(s_matrix2D_proxy, s_matrix1D_proxy, copyCB);
-        }
-        when copyComplete(bool success) {}
-        serial {
-          std::string filename = "data/Smatrix_q" + std::to_string(qindex);
-          matrixWrite(s_matrix1D_proxy, filename, writeCB);
-        }
-        // Print S-matrix to verify (end)
-
-        when s_ready() serial {
-          CkPrintf("[CONTROLLER] Prepare transferring data to MPI\n");
-          diag_bridge_proxy.prepareData(qindex, real_epsilon_size, qpts);
-        }
-        when diag_setup() serial {
-          CkPrintf("[CONTROLLER] Transfer data to MPI\n");
-          diag_bridge_proxy.copyToMPI(qindex, real_epsilon_size, s_matrix2D_proxy);
-        }
-        when mpi_copy_complete() serial {
-          CkPrintf("[CONTROLLER] Transfer to MPI is complete\n");
-          mainProxy.done();
-        }
-        when gpp_complete() serial {
-          diag_bridge_proxy.copyFromMPI(qindex, real_epsilon_size, s_matrix2D_proxy);
-        }
-        when mpi_received_complete () serial {
-          CkPrintf("[CONTROLLER] Phase-4 Bare Exchange, Screen Exchange and COH computation with GPP (sigma_mode = 1)\n");
-          CkPrintf("| Type               | K | n | n' |     Sigma       \n");
-          bare_x = screen_x = coh = (0.0,0.0);
-        }
-      }
+      // else if (sigma_mode == 1) {
+      //   // Print S-matrix to verify (start)
+      //   when s_ready() serial {
+      //     thisProxy.formGpp();
+      //   }
+      // }
       // Print S-matrix to verify (start)
       // when mpi_received_complete() serial {
       //   // int row = 17;
@@ -475,47 +459,86 @@ module controller {
           s_matrix2D_proxy.screenedExchange();
         else if (sigma_mode == 1)
           s_matrix2D_proxy.screenedExchangeGPP();
-
       }
+      if (sigma_mode == 0) { // Static Sigma
+        when screenedExchangeComplete(CkReductionMsg* msg) serial {
+          CkReduction::tupleElement* results = NULL;
+          int num_reductions = 0;
+          msg->toTuple(&results, &num_reductions);
+          int ik = 0;
 
-      when screenedExchangeComplete(CkReductionMsg* msg) serial {
-        CkReduction::tupleElement* results = NULL;
-        int num_reductions = 0;
-        msg->toTuple(&results, &num_reductions);
-        int ik = 0;
-
-        for(int k=0;k<K;k++){
-          for(int ib=0;ib<Bands;ib++){
-            complex dx = *(complex*)results[ik++].data;
-            screen_x_final[k][ib] += dx;
-            CkPrintf("-----------------------------------------------------------------\n");
-            CkPrintf("| Screen Exchange     | %d | %d | %d | %11.8f + %fi\t|\n", k, n_list[ib], np_list[ib], dx.re*27.2114, dx.im);
-            CkPrintf("|                     |   |   |   |                         \n");
+          for(int k=0;k<K;k++){
+            for(int ib=0;ib<Bands;ib++){
+              complex dx = *(complex*)results[ik++].data;
+              screen_x_final[k][ib] += dx;
+              CkPrintf("-----------------------------------------------------------------\n");
+              CkPrintf("| Screen Exchange     | %d | %d | %d | %11.8f + %fi\t|\n", k, n_list[ib], np_list[ib], dx.re*27.2114, dx.im);
+              CkPrintf("|                     |   |   |   |                         \n");
+            }
           }
+          delete msg;
+          s_matrix2D_proxy.coh();
         }
-        delete msg;
-        s_matrix2D_proxy.coh();
+        when cohComplete(CkReductionMsg* msg) serial {
+          CkReduction::tupleElement* results = NULL;
+          int num_reductions = 0;
+          msg->toTuple(&results, &num_reductions);
+          int ik = 0;
+          for(int k=0;k<K;k++){
+            for(int ib=0;ib<Bands;ib++){
+              complex dx = *(complex*)results[ik++].data;
+              coh_final[k][ib] += dx;
+              CkPrintf("| COH               | %d | %d | %d | %lf + %fi\t|\n", k, n_list[ib], np_list[ib], 0.5*round(dx.re*POW6)/POW6 * 27.2114, dx.im);
+              CkPrintf("|                   |   |   |   |                         \n");
+              CkPrintf("-----------------------------------------------------------------\n");
+            }
+          }
+          complex dx = *(complex*)results[ik].data;
+          CkPrintf("-----------------------------------------------------------------\n");
+          delete msg;
+          STOP_BIG_STEP("SELF ENERGY COMPUTATIONS COMPLETED");
+        }
+      } else if (sigma_mode == 1) { // GPP Sigma
+        when GppFormed(), screenedExchangeComplete(CkReductionMsg* msg) serial {
+          CkReduction::tupleElement* results = NULL;
+          int num_reductions = 0;
+          msg->toTuple(&results, &num_reductions);
+          int ik = 0;
+
+          for(int k=0;k<K;k++){
+            for(int ib=0;ib<Bands;ib++){
+              complex dx = *(complex*)results[ik++].data;
+              screen_x_final[k][ib] += dx;
+              CkPrintf("-----------------------------------------------------------------\n");
+              CkPrintf("| Dynamic GPP Screened Exchange     | %d | %d | %d | %11.8f + %fi\t|\n", k, n_list[ib], np_list[ib], dx.re*27.2114, dx.im);
+              CkPrintf("|                                   |   |   |   |                         \n");
+            }
+          }
+          delete msg;
+          s_matrix2D_proxy.cohGPP();
+        }
+        when cohComplete(CkReductionMsg* msg) serial {
+          CkReduction::tupleElement* results = NULL;
+          int num_reductions = 0;
+          msg->toTuple(&results, &num_reductions);
+          int ik = 0;
+          for(int k=0;k<K;k++){
+            for(int ib=0;ib<Bands;ib++){
+              complex dx = *(complex*)results[ik++].data;
+              coh_final[k][ib] += dx;
+              CkPrintf("| Dynamic GPP COH               | %d | %d | %d | %lf + %fi\t|\n", k, n_list[ib], np_list[ib], 0.5*round(dx.re*POW6)/POW6 * 27.2114, dx.im);
+              CkPrintf("|                               |   |   |   |                         \n");
+              CkPrintf("-----------------------------------------------------------------\n");
+            }
+          }
+          complex dx = *(complex*)results[ik].data;
+          CkPrintf("-----------------------------------------------------------------\n");
+          delete msg;
+          STOP_BIG_STEP("SELF ENERGY COMPUTATIONS COMPLETED");
+        }
       }
 
-      when cohComplete(CkReductionMsg* msg) serial {
-        CkReduction::tupleElement* results = NULL;
-        int num_reductions = 0;
-        msg->toTuple(&results, &num_reductions);
-        int ik = 0;
-        for(int k=0;k<K;k++){
-          for(int ib=0;ib<Bands;ib++){
-            complex dx = *(complex*)results[ik++].data;
-            coh_final[k][ib] += dx;
-            CkPrintf("| COH               | %d | %d | %d | %lf + %fi\t|\n", k, n_list[ib], np_list[ib], 0.5*round(dx.re*POW6)/POW6 * 27.2114, dx.im);
-            CkPrintf("|                   |   |   |   |                         \n");
-            CkPrintf("-----------------------------------------------------------------\n");
-          }
-        }
-        complex dx = *(complex*)results[ik].data;
-        CkPrintf("-----------------------------------------------------------------\n");
-        delete msg;
-        STOP_BIG_STEP("SELF ENERGY COMPUTATIONS COMPLETED");
-      }
+      
 
       serial {
         if(index==qpts-1)
@@ -541,6 +564,52 @@ module controller {
       CkExit();
     }
 
+    }
+
+    entry void formGpp() {
+      serial {
+        matrixCopy(s_matrix2D_proxy, s_matrix1D_proxy, copyCB);
+      }
+      when copyComplete(bool success) {}
+      serial {
+        std::string filename = "data/Smatrix_q" + std::to_string(qindex);
+        matrixWrite(s_matrix1D_proxy, filename, writeCB);
+      }
+      // Print S-matrix to verify (end)
+      serial {
+        START_STEP("GPP FORMED");
+        START_STEP("Transfer Eps to Gpp");
+        // CkPrintf("[CONTROLLER] Transfer Eps to Gpp\n");
+        s_matrix2D_proxy.transferToGpp(gpp2D_proxy, false);
+      }
+      when eps_to_gpp_complete() serial {
+        STOP_STEP("Transfer Eps to Gpp");
+        START_STEP("Prepare S matrix to MPI transfer");
+        // CkPrintf("[CONTROLLER] Prepare transferring data to MPI\n");
+        diag_bridge_proxy.prepareData(qindex, real_epsilon_size, qpts);
+      }
+      when diag_setup() serial {
+        STOP_STEP("Prepare S matrix to MPI");
+        START_STEP("Transfer data to MPI complete");
+        // CkPrintf("[CONTROLLER] Transfer data to MPI\n");
+        diag_bridge_proxy.copyToMPI(qindex, real_epsilon_size, gpp2D_proxy);
+      }
+      when mpi_copy_complete() serial {
+        STOP_STEP("Transfer data to MPI complete");
+        START_STEP("Diagonalization of S-matrix is complete")
+        // CkPrintf("[CONTROLLER] Transfer to MPI is complete\n");
+        mainProxy.done();
+      }
+      when gpp_complete() serial {
+        STOP_STEP("Diagonalization of S-matrix is complete")
+        START_STEP("Transfer of S-matrix from MPI is complete")
+        diag_bridge_proxy.copyFromMPI(qindex, real_epsilon_size, gpp2D_proxy);
+      }
+      when mpi_received_complete () serial {
+        STOP_STEP("Transfer of S-matrix from MPI is complete")
+        STOP_BIG_STEP("GPP FORMED");
+        thisProxy.GppFormed();
+      }
     }
 
     entry void formPMatrix() {

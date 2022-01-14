@@ -246,4 +246,5 @@ extern /* readonly */ CProxy_PsiCache psi_cache_proxy;
 extern /* readonly */ CProxy_FVectorCache fvector_cache_proxy;
 extern /* readonly */ CProxy_DiagBridge diag_bridge_proxy;
 extern /* readonly */ CProxy_EpsMatrix s_matrix2D_proxy;
+extern /* readonly */ CProxy_Gpp gpp2D_proxy;
 #endif

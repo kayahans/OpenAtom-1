@@ -1,27 +1,10 @@
+
 #include "matrix.h"
 #include "eps_matrix.decl.h"
 
 #include "mylapack.h"
 #include "CLA_Matrix.h"
 #include "ckcomplex.h"
-
-class DiagBridge : public CBase_DiagBridge {
-  DiagBridge_SDAG_CODE
-  
-  public:
-    unsigned int row_size, col_size;
-    unsigned int totaldata; // Total data in the diagData pointer
-    unsigned int numBlocks; // Number of blocks MB X MB block grid
-    unsigned int proc_rows, proc_cols; // processor grid
-    double* data;
-    DiagBridge() {};
-
-    DiagBridge(int totaldata) : totaldata(totaldata) {
-      data = new double[totaldata];
-    }
-    void prepareData(int qindex, int size, int num_qpts);
-    
-};
 
 class EpsMatrix : public CBase_EpsMatrix {
   EpsMatrix_SDAG_CODE
@@ -35,8 +18,6 @@ class EpsMatrix : public CBase_EpsMatrix {
     CLA_Matrix_interface matrix;
     unsigned int blockSize, numBlocks, block;
 
-    bool has_eigenvalues = false;
-    std::vector<complex> eigenvalues;
   public:
     EpsMatrix();
     EpsMatrix(MatrixConfig config);
@@ -57,20 +38,20 @@ class EpsMatrix : public CBase_EpsMatrix {
     void screenedExchangeGPP();
     void bareExchange();
     void coh();
+    void cohGPP();
     void scalar_multiply(double alpha);
     void convergence_check(CProxy_EpsMatrix cmp_proxy);
     void add_compl_two();
     void multiply_coulb();
     void print_col(int num);
     void print_row(int num);
+    void transferToGpp(CProxy_Gpp other, bool todo); 
     void createCopy(CProxy_EpsMatrix other, bool todo);
     void recvCopy(std::vector<complex> new_data);
     void setI(CLA_Matrix_interface mat, bool clean);
     void receiveConvCheck(std::vector<complex> incoming);
-    DiagMessage* receiveDataSimple(DiagMessage* msg);
-    DiagMessage* sendDataSimple(DiagMessage* msg);
+    
     static void done_cb(void *obj){
      ((EpsMatrix*) obj)->round_done();
     }
 };
-

@@ -64,10 +64,10 @@ Controller::Controller() {
 
   epsCut = gwbse->gw_epsilon.Ecuteps;
   tol_iter_mtxinv = gwbse->gw_epsilon.tol_iter;
-  alat = 10.261200; 
-  shift[0] = 0;
-  shift[1] = 0;
-  shift[2] = 0.001;
+  alat = 10.261200; // TODO (kayahans) hardcoded
+  shift[0] = 0;  // TODO (kayahans) hardcoded
+  shift[1] = 0;  // TODO (kayahans) hardcoded
+  shift[2] = 0.001;  // TODO (kayahans) hardcoded
   maxiter = gwbse->gw_epsilon.max_iter?gwbse->gw_epsilon.max_iter:MAX_ITERATIONS;
   // TODO: Make these config options
   do_output = true;

@@ -30,6 +30,7 @@
 #include "CkLoopAPI.h"
 #include "../diagonalizer/diagonalizer.h"
 #include "mpi-interoperate.h"
+#include "gpp.h"
 
 
 // =========================================================================
@@ -55,7 +56,9 @@
 /* readonly */ CProxy_PMatrix pmatrix2D_proxy;
 /* readonly */ CProxy_PMatrix pmatrix1D_proxy;
 /* readonly */ CProxy_EpsMatrix s_matrix2D_proxy;
+
 // Epsilon matrices (Phase 3 & 4)
+/* readonly */ CProxy_Gpp gpp2D_proxy;
 //==========================================================================
 //cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 //==========================================================================
@@ -96,7 +99,8 @@ Main::Main(CkArgMsg* msg) {
   psi_cache_proxy = CProxy_PsiCache::ckNew();
   fvector_cache_proxy = CProxy_FVectorCache::ckNew();
   diag_bridge_proxy = CProxy_DiagBridge::ckNew();
-  mat_mul_proxy = CProxy_MatMul::ckNew();
+  // gpp2D_proxy = CProxy_Gpp::ckNew();
+  mat_mul_proxy    = CProxy_MatMul::ckNew();
 
   // -------------------------------------------------------------------
   // Create the array of state chare objects.
