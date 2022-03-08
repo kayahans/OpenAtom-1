@@ -80,7 +80,11 @@ class Controller : public CBase_Controller {
     void computeEpsDimensions();
     void calc_Geps();
     void got_geps(std::vector<int> accept, int epsilon_size);
-    void got_vcoulb(std::vector<double> vcoulb_in, double vcoulb0);
+    void got_vcoulb(std::vector<double> vcoulb_in, double vcoulb0,
+                                        std::vector<double> ga, 
+                                    std::vector<double> gb, 
+                                    std::vector<double> gc, 
+                                    int ng);
   private:
     bool do_output;
     int msg_received;
@@ -125,6 +129,8 @@ class Controller : public CBase_Controller {
     CProxy_EpsMatrix eps_matrix2D_m_proxy, eps_matrix2D_mT_proxy,
                      eps_matrix2D_X_proxy, eps_matrix2D_A_proxy,
                      eps_matrix2D_M1_proxy, eps_matrix2D_X1_proxy;
+    CProxy_EpsMatrix sdiagT_matrix2D_proxy, sdiagH_matrix2D_proxy, sdiag_matrix2D_proxy;
+    CProxy_EpsMatrix gpp2D_M0_proxy, gpp2D_M1_proxy, gpp2D_T_M0_proxy;
 };
 
 // A struct containing the required info for computing a set of f vectors for a
@@ -152,13 +158,21 @@ class PsiCache : public CBase_PsiCache {
 
     void receivePsi(PsiMessage*);
     void computeFs(PsiMessage*);
+    void send_rhodata(PsiMessage*);
     void reportFTime();
     complex* getPsi(unsigned, unsigned, unsigned) const;
     complex* getF(unsigned,unsigned) const;
-    void setVCoulb(std::vector<double> vcoulb_in, double vcoulb0);
+    void setVCoulb(std::vector<double> vcoulb_in, double vcoulb0, std::vector<double> _ga, std::vector<double> _gb, std::vector<double>_gc, int ng);
     std::vector<double> getVCoulb();
+    std::vector<double> get_ga();
+    std::vector<double> get_gb();
+    std::vector<double> get_gc();
+    int get_ng();
+
     double getVCoulb0();
     complex* getStates();
+    complex* getRhoData();
+    int* getRhosize();
     bool in_np_list(int n_index);
     int get_index(int n_index);
     void setQIndex(int q_index);
@@ -177,16 +191,24 @@ class PsiCache : public CBase_PsiCache {
     // TODO: Flatten arrays?
     complex*** psis;
     complex*** psis_shifted;
+    complex* rhoData;
+    complex* rhoDataG;
     complex* fs;
     complex *fsave;
     complex *f_nop;
     complex *states;
     std::vector<double> vcoulb;
+    std::vector<double> ga;
+    std::vector<double> gb;
+    std::vector<double> gc;
+    int ng;
     complex* umklapp_factor;
     int n_np;
+    int ndata_rho;
+    int *nr;
     int *n_list, *np_list;
     double vcoulb_0;
-
+    
     double total_time;
 
     // Used for registering fvector regions
@@ -246,5 +268,5 @@ extern /* readonly */ CProxy_PsiCache psi_cache_proxy;
 extern /* readonly */ CProxy_FVectorCache fvector_cache_proxy;
 extern /* readonly */ CProxy_DiagBridge diag_bridge_proxy;
 extern /* readonly */ CProxy_EpsMatrix s_matrix2D_proxy;
-extern /* readonly */ CProxy_Gpp gpp2D_proxy;
+extern /* readonly */ CProxy_Gpp gpp1D_proxy, gpp2D_proxy;
 #endif

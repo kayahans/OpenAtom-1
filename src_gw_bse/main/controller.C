@@ -136,9 +136,13 @@ void Controller::calc_Geps() {
   fft_controller->calc_vcoulb(this_q, a1, a2, a3, b1, b2, b3, shift, alat, gwbse->gwbseopts.nkpt, qindex, gwbse->gwbseopts.nk);
 }
 
-void Controller::got_vcoulb(std::vector<double> vcoulb_in, double vcoulb0){
+void Controller::got_vcoulb(std::vector<double> vcoulb_in, double vcoulb0,
+                                    std::vector<double> ga, 
+                                    std::vector<double> gb, 
+                                    std::vector<double> gc,
+                                    int ng){
   vcoulb = vcoulb_in;
-  psi_cache_proxy.setVCoulb(vcoulb_in, vcoulb0);
+  psi_cache_proxy.setVCoulb(vcoulb_in, vcoulb0, ga, gb, gc, ng);
 }
 
 PsiCache::PsiCache() {
@@ -171,6 +175,19 @@ PsiCache::PsiCache() {
     for (int l = 0; l < L; l++) {
       psis_shifted[k][l] = new complex[psi_size];
     }
+  }
+  // 02.02.2022 Kayahan added GPP rhoData, stored at every node FFT in place
+  int sigma_mode = gw_sigma->sigma_mode;
+  if (sigma_mode == 1) {
+    ndata_rho = gw_sigma->ndata_rho;
+    rhoData = new complex[ndata_rho];
+    for (int l = 0; l < ndata_rho; l++) {
+      rhoData[l] = gw_sigma->rhoData[l];
+    }
+    nr = new int[3];
+    nr[0] = gw_sigma->nr1;
+    nr[1] = gw_sigma->nr2;
+    nr[2] = gw_sigma->nr3;
   }
 
   fs = new complex[L*psi_size*pipeline_stages];
@@ -260,6 +277,20 @@ void PsiCache::receivePsi(PsiMessage* msg) {
     //CkPrintf("[%d]: Cache filled\n", CkMyPe());
     contribute(CkCallback(CkReductionTarget(Controller,cachesFilled), controller_proxy));
   }
+}
+
+void PsiCache::send_rhodata(PsiMessage* msg) {
+  CkAssert(msg->spin_index == -1);
+  // CkAssert(msg->k_index == -1);
+  CkAssert(msg->state_index == -1);
+  // CkAssert(msg->size == psi_size);
+  if (msg->k_index == 0) {
+    int size = msg->size; 
+    delete [] rhoData;
+    rhoData = new complex[size];
+    std::copy(msg->psi, msg->psi+size, rhoData);
+  }
+  contribute(CkCallback(CkReductionTarget(Controller, gpp_fft_complete), controller_proxy));
 }
 
 /**
@@ -571,14 +602,38 @@ complex* PsiCache::getStates() {
   return states;
 }
 
-void PsiCache::setVCoulb(std::vector<double> vcoulb_in, double vcoulb0){
+complex* PsiCache::getRhoData() {
+  return rhoData;
+}
+
+int* PsiCache::getRhosize() {
+  return nr;
+}
+
+void PsiCache::setVCoulb(std::vector<double> vcoulb_in, double vcoulb0, std::vector<double> _ga, std::vector<double> _gb, std::vector<double>_gc, int _ng){
   vcoulb = vcoulb_in;
   vcoulb_0 = vcoulb0;
+  ga = _ga;
+  gb = _gb;
+  gc = _gc;
+  ng = _ng;
   contribute(CkCallback(CkReductionTarget(Controller,prepare_epsilon), controller_proxy));
 }
 
 std::vector<double> PsiCache::getVCoulb() {
   return vcoulb;
+}
+std::vector<double> PsiCache::get_ga() {
+  return ga;
+}
+std::vector<double> PsiCache::get_gb() {
+  return gb;
+}
+std::vector<double> PsiCache::get_gc() {
+  return gc;
+}
+int PsiCache::get_ng() {
+  return ng;
 }
 
 double PsiCache::getVCoulb0() {

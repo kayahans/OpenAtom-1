@@ -16,7 +16,6 @@ FFTController::FFTController() {
 
   geps = new GSPACE();
   
-
   // TODO: A group dependency could probably solve this better
   contribute(CkCallback(CkReductionTarget(Controller, fftControllerReady), controller_proxy));
 }
@@ -96,7 +95,7 @@ double FFTController::compute_average_mbz(const double pa,const double pb,const 
 double FFTController::average_mbz(double pa,double pb,double pc,double *hmatik,
                    int Na,int Nb,int Nc,double tol)
 {
-  DEBUG(("pa=%g pb=%g pc=%g tol=%g : n avg\n",pa,pb,pc,tol));
+  printf("pa=%g pb=%g pc=%g tol=%g : n avg\n",pa,pb,pc,tol);
   // we are going to make a table of computed results as we go
   // actually, only the last two entries are useful...
   const int ntable=10;
@@ -148,7 +147,6 @@ double FFTController::average_mbz(double pa,double pb,double pc,double *hmatik,
 void FFTController:: calc_vcoulb(double* qvec, double* a1, double* a2, double* a3,
                                  double* b1, double* b2, double * b3, double shift[3],
                                  double alat, int nkpt, int iq, int *nk){
-
   double* vcoulb;
   vcoulb = new double [geps->ng];
   double gx, gy, gz;
@@ -156,7 +154,9 @@ void FFTController:: calc_vcoulb(double* qvec, double* a1, double* a2, double* a
   double vol = calc_vol(a1, a2, a3);
   double fact = 4*PI/vol/nkpt;
   double vcoulb0 = 0;
-
+  std::vector<double> ga(geps->ng);
+  std::vector<double> gb(geps->ng);
+  std::vector<double> gc(geps->ng);
   for (int i=0; i<geps->ng; i++) {
       if (iq==0) {
           if(i==0){
@@ -181,7 +181,9 @@ void FFTController:: calc_vcoulb(double* qvec, double* a1, double* a2, double* a
           gy = geps->jg[i] + qvec[1];
           gz = geps->kg[i] + qvec[2];
       }
-
+      ga[i] =  geps->ig[i] + qvec[0];
+      gb[i] =  geps->jg[i] + qvec[1];
+      gc[i] =  geps->kg[i] + qvec[2];
       vcoulb[i] = 0;
       for (int j=0; j<3; j++) {
           gq[j] =  gx*b1[j] + gy*b2[j] + gz*b3[j];
@@ -197,7 +199,7 @@ void FFTController:: calc_vcoulb(double* qvec, double* a1, double* a2, double* a
   vcoulb_v.resize(geps->ng);
   for(int i=0;i<geps->ng;i++)
     vcoulb_v[i] = vcoulb[i];
-  controller_proxy.got_vcoulb(vcoulb_v, vcoulb0);
+  controller_proxy.got_vcoulb(vcoulb_v, vcoulb0, ga, gb, gc, geps->ng);
 }
 
 void FFTController::get_geps(double epsCut, double* qvec, double* b1, double* b2, double * b3, 
@@ -248,6 +250,12 @@ void FFTController::get_geps(double epsCut, double* qvec, double* b1, double* b2
     geps->ig = new int [eps_size];
     geps->jg = new int [eps_size];
     geps->kg = new int [eps_size];
+
+
+
+    // ga = new double[eps_size];
+    // gb = new double[eps_size];
+    // gc = new double[eps_size];
    
     int j=0;
 

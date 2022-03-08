@@ -184,7 +184,7 @@ void Matrix::sendData(CProxy_Matrix dest, int dest_rows, int dest_cols) {
       msg->num_rows = rows;
       msg->num_cols = cols;
       packMsg(msg);
-
+      
       int chare_row = row_idx / dest_rows;
       int chare_col = col_idx / dest_cols;
       dest(chare_row,chare_col).receiveData(msg);

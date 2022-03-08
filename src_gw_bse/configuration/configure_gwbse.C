@@ -175,6 +175,7 @@ void Config::readConfig(char* input_name, GWBSE *gwbse)
   read_lattice( gwbseopts );
   read_klist( gwbseopts );
   read_nnpbandlist ( gw_sigma );
+  read_rhodata ( gw_sigma );
 
   //===================================================================================
   // Final consistency checks
@@ -477,7 +478,7 @@ void Config::set_config_dict_GW_epsilon  (int *num_dict ,DICT_WORD **dict){
 void Config::set_config_dict_GW_sigma  (int *num_dict ,DICT_WORD **dict){
   //==================================================================================
   //  I) Malloc the dictionary                                              
-  num_dict[0] = 4;
+  num_dict[0] = 6;
   *dict = (DICT_WORD *)cmalloc(num_dict[0]*sizeof(DICT_WORD),"set_dict_gen_GW")-1;
 
   //=================================================================================
@@ -526,8 +527,15 @@ void Config::set_config_dict_GW_sigma  (int *num_dict ,DICT_WORD **dict){
   //  5)\sigma_mode{}
   ind =   5;   
   strcpy((*dict)[ind].keyword,"sigma_mode");
-  strcpy((*dict)[ind].keyarg,"0");
+  strcpy((*dict)[ind].keyarg,"1");
   strcpy((*dict)[ind].error_mes,"an integer");
+
+  //-----------------------------------------------------------------------------
+  //  6)\sigma_mode{}
+  ind =   6;   
+  strcpy((*dict)[ind].keyword,"rho_file");
+  strcpy((*dict)[ind].keyarg,"rho.dat");
+  strcpy((*dict)[ind].error_mes,"a file containing real-space charge density");
   //-----------------------------------------------------------------------------
 }//end routine
 //===================================================================================
@@ -1068,6 +1076,11 @@ void Config::set_config_params_GW_sigma  (DICT_WORD *dict, char *fun_key, char *
   sscanf(dict[ind].keyarg,"%d",&int_arg);
   if (int_arg<0){keyarg_barf(dict,input_name,fun_key,ind);}
   gw_sigma->sigma_mode = int_arg; 
+
+  // 6) rho (density) filename 
+  ind =   6;
+  strcpy(gw_sigma->rhoFilename, dict[ind].keyarg); // must put somewhere!
+  if (strlen(gw_sigma->rhoFilename) == 0){keyarg_barf(dict,input_name,fun_key,ind);}  
   //----------------------------------------------------------------------------- 
 }// end routine
 //================================================================================
@@ -1770,6 +1783,56 @@ void Config::read_nnpbandlist(GW_SIGMA *gw_sigma){
         }
         // close file
  fclose(fp);
+}// end routine
+
+// Read rho.dat file (QE charge density). Should be requested only for GPP calculations
+void Config::read_rhodata(GW_SIGMA *gw_sigma) {
+  if (gw_sigma->sigma_mode > 0) {
+    FILE *fp;
+    char rhoFile[1000];
+    int nr[3];
+    // TODO(kayahans): fix later
+    
+    if ((fp = fopen("rho.dat","r"))) { 
+      fscanf(fp, "%d %d %d", &nr[0], &nr[1], &nr[2]);
+      int ndata_rho = nr[0]*nr[1]*nr[2];
+      gw_sigma->ndata_rho = ndata_rho;
+      gw_sigma->nr1 = nr[0];
+      gw_sigma->nr2 = nr[1];
+      gw_sigma->nr3 = nr[2];
+      gw_sigma->rhoData = new complex[ndata_rho];
+
+      // scale rhoData if qespresso is true
+      // TODO(kayahans): hardcoded
+      double scale;
+      bool qespresso = true;
+      if(qespresso) {
+        double vol = 270.106146;
+        scale = vol/double(ndata_rho); 
+      }
+      else {
+        scale = 1.0; 
+      }
+
+      // read data
+      int counter=0;
+      for(int i=0; i<nr[0]; i++){
+        for(int j=0; j<nr[1]; j++){
+          for(int k=0; k<nr[2]; k++){
+            double rho_tmp;
+            fscanf(fp, "%lg", &(rho_tmp));
+            if( qespresso ){ rho_tmp *= scale; }
+            gw_sigma->rhoData[counter] = rho_tmp;
+            counter += 1;
+          }
+        }
+      }
+      fclose(fp);
+    } else {
+      CkPrintf("rho.dat file couldn't be opened, exiting!\n");
+      EXIT(1);
+    }
+  }
 }// end routine
 
 

@@ -1,6 +1,12 @@
 #include <complex>
 #ifndef _diagonalizer_h_
 #define _diagonalizer_h_
+struct matel {
+  int x;
+  int y;
+  std::complex<double> val;
+};
+
 struct diagData_t {
   int qindex;
 
@@ -18,8 +24,9 @@ struct diagData_t {
   int nb = 0; // block size
   
   std::complex<double>* input;  // Input matrix (row_size x col_size = inputsize)
-  std::complex<double>* eig_v;  // Eigenvectors (n x n)
-  std::complex<double>* eig_e;  // Eigenvalues (n x 1)
+  std::complex<double>* eig_v;  // Input matrix (row_size x col_size = inputsize)
+  matel* eig_v2;  // Eigenvectors (n x n)
+  double* eig_e;  // Eigenvalues (n x 1)
 
 };
 

@@ -62,7 +62,7 @@ class DiagMessage : public CMessage_DiagMessage {
     DiagMessage() {
     }
     complex data[400];
-    complex eigenvalues[20];
+    double eigenvalues[20];
     int size;
     int eps_size;
     int x;

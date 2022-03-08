@@ -43,8 +43,13 @@ module controller {
     entry void calc_Geps();
     entry void receiveEpsDimensions(std::vector<int> accept, std::vector<int>
                                     geps_x,std::vector<int> geps_y,
-                                    std::vector<int> geps_z, int epsilon_size);
-    entry void got_vcoulb(std::vector<double> vcoulb, double vcoulb0);
+                                    std::vector<int> geps_z,
+                                    int epsilon_size);
+    entry void got_vcoulb(std::vector<double> vcoulb, double vcoulb0,
+                                    std::vector<double> ga, 
+                                    std::vector<double> gb, 
+                                    std::vector<double> gc,
+                                    int ng);
     entry [reductiontarget] void fftControllerReady();
     entry [reductiontarget] void psiCacheReady();
     entry [reductiontarget] void fCacheReady();
@@ -57,7 +62,11 @@ module controller {
     entry [reductiontarget] void copyComplete(bool success);
     entry [reductiontarget] void transpose_complete();
     entry [reductiontarget] void copy_complete();
-    entry [reductiontarget] void eps_to_gpp_complete();
+    entry [reductiontarget] void gpp_M0_complete();
+    entry [reductiontarget] void gpp_fft_complete();
+    entry [reductiontarget] void gpp_omsq_complete();
+    entry [reductiontarget] void gpp_vc_complete();
+    entry [reductiontarget] void gpp_debug_complete();
     entry [reductiontarget] void s_ready();
     entry [reductiontarget] void m_multiplied();
     entry [reductiontarget] void conjugateComplete();
@@ -72,11 +81,15 @@ module controller {
     entry [reductiontarget] void cohComplete(CkReductionMsg* msg);
     entry [reductiontarget] void diag_setup();
     entry [reductiontarget] void mpi_copy_complete();
+    entry [reductiontarget] void transferfromGpp_complete();
+    entry [reductiontarget] void transferToGpp_complete();
     entry [reductiontarget] void mpi_received_complete();
-    entry [reductiontarget] void gpp_complete();
+    entry [reductiontarget] void mpi_complete();
     entry [reductiontarget] void readComplete(bool success);
     entry [reductiontarget] void writeComplete(bool success);
     entry [reductiontarget] void verifyComplete(bool success);
+    entry void gpp_M1_complete();
+    entry void gpp_M2_complete();    
     entry void PMatrixFormed();
     entry void EpsilonFormed();
     entry void EpsilonInverted();
@@ -127,6 +140,7 @@ module controller {
         real_epsilon_size = epsilon_size;
         fvector_cache_proxy.setDim(padded_epsilon_size/eps_rows,
                                     accept,geps_x,geps_y,geps_z);
+        
         states_proxy.fftGtoR(qindex);
       }
       when fftComplete() serial {
@@ -232,14 +246,31 @@ module controller {
 
         s_matrix2D_proxy = CProxy_EpsMatrix::ckNew(
             cfg2D, opts);
+        MatrixConfig cfg1D = convertTo1D(cfg2D, eps_rows);
         
+        sigma_mode = 1;
         if (sigma_mode == 1) {
           gpp2D_proxy = CProxy_Gpp::ckNew(
             cfg2D, opts);
+          gpp1D_proxy = CProxy_Gpp::ckNew(
+            cfg1D, cfg1D.chareRows(), cfg1D.chareCols());
+
           gpp2D_proxy.setQIndex(qindex);
+          sdiagT_matrix2D_proxy = CProxy_EpsMatrix::ckNew(
+            cfg2D, opts);
+          sdiag_matrix2D_proxy = CProxy_EpsMatrix::ckNew(
+            cfg2D, opts);  
+          sdiagH_matrix2D_proxy = CProxy_EpsMatrix::ckNew(
+            cfg2D, opts);            
+          gpp2D_M0_proxy = CProxy_EpsMatrix::ckNew(
+            cfg2D, opts);
+          gpp2D_T_M0_proxy = CProxy_EpsMatrix::ckNew(
+            cfg2D, opts);
+          gpp2D_M1_proxy = CProxy_EpsMatrix::ckNew(
+            cfg2D, opts);
         }
         
-        MatrixConfig cfg1D = convertTo1D(cfg2D, eps_rows);
+        
         eps_matrix1D_proxy = CProxy_EpsMatrix::ckNew(
             cfg1D, cfg1D.chareRows(), cfg1D.chareCols());
         
@@ -416,7 +447,7 @@ module controller {
       //   matrixCopy(s_matrix2D_proxy, s_matrix1D_proxy, copyCB);
       //   // CkPrintf("[CONTROLLER] Writing S-matrix eigenvectors to file\n");
       //   // std::string filename = "data/Smatrix_eigv_q" + std::to_string(qindex);
-      //   // matrixWrite(s_matrix1D_proxy, filename, writeCB);
+      //   // matrixWrite (s_matrix1D_proxy, filename, writeCB);
       // }
       // when copyComplete(bool success) serial {
       //   CkPrintf("[CONTROLLER] Writing S-matrix eigenvectors to file\n");
@@ -434,8 +465,8 @@ module controller {
           when prepare_epsilon() serial { }
         }
       }
-
-      serial{
+      // TODO(kayahans): change here later
+      when GppFormed() serial{
         eps_matrix2D_X_proxy.bareExchange();
       }
 
@@ -455,12 +486,12 @@ module controller {
           }
         }
         delete msg;
-        if (sigma_mode == 0) 
+        if (sigma_mode == 0 || sigma_mode == 1) 
           s_matrix2D_proxy.screenedExchange();
-        else if (sigma_mode == 1)
+        else if (sigma_mode == 2)
           s_matrix2D_proxy.screenedExchangeGPP();
       }
-      if (sigma_mode == 0) { // Static Sigma
+      if (sigma_mode == 0 || sigma_mode == 1) { // Static Sigma
         when screenedExchangeComplete(CkReductionMsg* msg) serial {
           CkReduction::tupleElement* results = NULL;
           int num_reductions = 0;
@@ -498,8 +529,9 @@ module controller {
           delete msg;
           STOP_BIG_STEP("SELF ENERGY COMPUTATIONS COMPLETED");
         }
-      } else if (sigma_mode == 1) { // GPP Sigma
-        when GppFormed(), screenedExchangeComplete(CkReductionMsg* msg) serial {
+      } 
+      else if (sigma_mode == 2) { // GPP Sigma
+        when screenedExchangeComplete(CkReductionMsg* msg) serial {
           CkReduction::tupleElement* results = NULL;
           int num_reductions = 0;
           msg->toTuple(&results, &num_reductions);
@@ -567,6 +599,7 @@ module controller {
     }
 
     entry void formGpp() {
+      // Print S-matrix to verify (start)
       serial {
         matrixCopy(s_matrix2D_proxy, s_matrix1D_proxy, copyCB);
       }
@@ -578,37 +611,127 @@ module controller {
       // Print S-matrix to verify (end)
       serial {
         START_STEP("GPP FORMED");
-        START_STEP("Transfer Eps to Gpp");
+        START_STEP("Store S Matrix");
         // CkPrintf("[CONTROLLER] Transfer Eps to Gpp\n");
-        s_matrix2D_proxy.transferToGpp(gpp2D_proxy, false);
+        matrixCopy(s_matrix2D_proxy, sdiag_matrix2D_proxy, copyCB);
       }
-      when eps_to_gpp_complete() serial {
-        STOP_STEP("Transfer Eps to Gpp");
+      when copyComplete(bool success) serial{ 
+        STOP_STEP("Store S Matrix");
         START_STEP("Prepare S matrix to MPI transfer");
-        // CkPrintf("[CONTROLLER] Prepare transferring data to MPI\n");
         diag_bridge_proxy.prepareData(qindex, real_epsilon_size, qpts);
       }
       when diag_setup() serial {
-        STOP_STEP("Prepare S matrix to MPI");
-        START_STEP("Transfer data to MPI complete");
-        // CkPrintf("[CONTROLLER] Transfer data to MPI\n");
-        diag_bridge_proxy.copyToMPI(qindex, real_epsilon_size, gpp2D_proxy);
+        STOP_STEP("Prepare S matrix to MPI transfer");
+        START_STEP("Transfer S to MPI");
+        diag_bridge_proxy.copyToMPI(qindex, real_epsilon_size, sdiag_matrix2D_proxy);
       }
       when mpi_copy_complete() serial {
-        STOP_STEP("Transfer data to MPI complete");
-        START_STEP("Diagonalization of S-matrix is complete")
-        // CkPrintf("[CONTROLLER] Transfer to MPI is complete\n");
+        STOP_STEP("Transfer S to MPI");
+        START_STEP("S diagonalized")
         mainProxy.done();
       }
-      when gpp_complete() serial {
-        STOP_STEP("Diagonalization of S-matrix is complete")
-        START_STEP("Transfer of S-matrix from MPI is complete")
-        diag_bridge_proxy.copyFromMPI(qindex, real_epsilon_size, gpp2D_proxy);
+      when mpi_complete() serial {
+        STOP_STEP("S diagonalized")
+        START_STEP("Transfer S from MPI")
+        diag_bridge_proxy.copyFromMPI(qindex, real_epsilon_size, sdiag_matrix2D_proxy, gpp2D_proxy);
+        // Each row of sdiag_matrix2D_proxy is an eigenvector
+        // Print first eigenvector: sdiag_matrix2D_proxy.print_row(0);
       }
+      // kayahan
       when mpi_received_complete () serial {
-        STOP_STEP("Transfer of S-matrix from MPI is complete")
-        STOP_BIG_STEP("GPP FORMED");
-        thisProxy.GppFormed();
+        STOP_STEP("Transfer S from MPI")
+        START_STEP("S Transpose")
+        sdiag_matrix2D_proxy.createTranspose(sdiagT_matrix2D_proxy, false);
+      }
+      when transpose_complete() serial {
+        STOP_STEP("S Transpose")
+        START_STEP("GPP Rhodata FFT R to G")
+        gpp2D_proxy.RtoG(qindex);
+      }
+      when gpp_fft_complete() serial {
+        STOP_STEP("GPP Rhodata FFT R to G")
+        START_STEP("GPP calculate VC")
+        gpp2D_proxy.calculate_vc();
+      }
+      when gpp_vc_complete() serial {
+        STOP_STEP("GPP calculate VC")
+        START_STEP("GPP prepare M0")
+        gpp2D_proxy.calc_M0();
+      }
+      when gpp_M0_complete() serial {
+        STOP_STEP("GPP prepare M0")
+        START_STEP("GPP M1 = M0 * V^T Step 1/2")
+        sdiag_matrix2D_proxy.print(qindex, 0);
+      //   std::string filename = "output/SDIAG_q" + std::to_string(qindex);
+      //   matrixWrite(sdiag_matrix2D_proxy, filename, writeCB);
+      // }
+      // when writeComplete(bool success) serial { 
+        gpp2D_M0_proxy.transferFromGpp(gpp2D_proxy, false);
+        // matrixCopy(gpp2D_proxy, gpp2D_M0_proxy, copyCB);
+      }
+      // when copyComplete(bool success) serial{ 
+      when transferfromGpp_complete() serial{
+        gpp2D_proxy.print(qindex, 1); // Print to GPP_1 files
+        // std::string filename = "output/GPP_M0_q" + std::to_string(qindex);
+        // matrixWrite(gpp2D_M0_proxy, filename, writeCB);
+      // }
+      // when writeComplete(bool success) serial {              
+        gpp2D_M0_proxy.createTranspose(gpp2D_T_M0_proxy, false);
+      }
+      when transpose_complete() serial {
+      //   //Mggp*V^T = C
+        // gpp2D_M0_proxy.print(2);
+        // gpp2D_T_M0_proxy.print(3);
+        mat_mul_proxy.do_multiply(gpp2D_M0_proxy, sdiagT_matrix2D_proxy, gpp2D_M1_proxy, 1.0);
+      }
+      when m_multiplied() serial {
+        STOP_STEP("GPP M1 = M0 * V^T Step 1/2")
+        // EPS_3 file
+        // gpp2D_M1_proxy.print(4);
+        thisProxy.gpp_M1_complete();
+      }
+      when gpp_M1_complete() {
+        serial {
+          START_STEP("GPP M = V^H * M1 Step 2/2")
+          sdiag_matrix2D_proxy.createConjugate(sdiagH_matrix2D_proxy);
+        }
+        when conjugateComplete() serial {
+          //V^H*Mggp = C
+          // sdiagH_matrix2D_proxy.print(5);
+          mat_mul_proxy.do_multiply(sdiag_matrix2D_proxy, gpp2D_M1_proxy, gpp2D_M0_proxy, 1.0);
+        }
+        when m_multiplied() serial {
+          STOP_STEP("GPP M = V^H * M1 Step 2/2")
+          // Print to EPS_2 files
+          // gpp2D_M0_proxy.print(6); 
+          thisProxy.gpp_M2_complete();
+        }
+      }
+      when gpp_M2_complete() {
+        serial {
+          // matrixCopy(gpp2D_M0_proxy, gpp2D_proxy, copyCB);
+          gpp2D_M0_proxy.transferToGpp(gpp2D_proxy, false);
+        }
+        // when copyComplete(bool success) serial{ 
+        when transferToGpp_complete() serial {
+          START_STEP("GPP OMSQ")
+          // gpp2D_proxy.print(7);
+          gpp2D_proxy.calc_omsq();
+        }
+      }
+      when gpp_omsq_complete() {
+        serial {
+          STOP_STEP("GPP OMSQ")
+          matrixCopy(gpp1D_proxy, gpp2D_proxy, copyCB);
+        }
+        when copyComplete(bool success) serial {
+          gpp1D_proxy.debug();
+        }
+        // TODO(kayahans): FFT back to R space
+        when gpp_debug_complete() serial { 
+          STOP_BIG_STEP("GPP FORMED");
+          thisProxy.GppFormed();
+        }
       }
     }
 

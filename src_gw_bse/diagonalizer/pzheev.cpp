@@ -27,6 +27,10 @@ extern "C" {
   void pdsyev_(char *jobz, char *uplo, int *n, double *a, int *ia, int *ja,
                   int *desca, double *w, double *z, int *iz, int *jz, int *descz,
                   double *work, int *lwork, int *info);
+  void pclaprnt_( int * m, int * n, std::complex<double> * A, int * ia, int * ja,
+		  int * desca, int * irprnt, int * icprn, char * cmatnm,
+		  int * nout,
+		  std::complex<double> * work, int);
 }
 
 static int max(int a, int b) {
@@ -90,7 +94,8 @@ int main(int argc, char **argv){
   int iternum = 1;
 
   for ( ; iternum <= total_iter; iternum++) {
-    printf("Handoff to MPI for diagonalization at PE %d\n", CkMyPe());
+    // kayahan debug
+    // printf("Handoff to MPI for diagonalization at PE %d\n", CkMyPe());
     nprow   =  diagData->nprow;
     npcol   =  diagData->npcol;
     n       =  diagData->n;
@@ -113,13 +118,15 @@ int main(int argc, char **argv){
     Cblacs_gridinit(&ictxt, "R", nprow, npcol);
     Cblacs_gridinfo(ictxt, &nprow, &npcol, &myrow, &mycol);
     int size = diagData->inputsize;
-    printf("[DIAGONALIZER] on proc %dx%d of %dx%d inputsize %d nb %d n %d iternum %d\n",myrow+1, mycol+1, nprow, npcol, size, nb, n, iternum);
+    // kayahan debug
+    // printf("[DIAGONALIZER] on proc %dx%d of %dx%d inputsize %d nb %d n %d iternum %d\n",myrow+1, mycol+1, nprow, npcol, size, nb, n, iternum);
     // for (int i=0; i < 10 ; i++) {
     //   printf("[DIAGONALIZER] on proc %dx%d of %dx%d inputsize %d nb %d n %d iternum %d, %.8e + %.8e\n",myrow+1, mycol+1, nprow, npcol, size, nb, n, iternum, diagData->input[i].real(), diagData->input[i].imag());
     // }
     mpA = numroc_(&n, &nb, &myrow, &izero, &nprow);
     nqA = numroc_(&n, &nb, &mycol, &izero, &npcol);
-    printf("pa qa %d, %d %dx%d \n", mpA, nqA, myrow+1, mycol+1);
+    // kayahan debug 
+    // printf("pa qa %d, %d %dx%d \n", mpA, nqA, myrow+1, mycol+1);
     min_mn = n;
 
     A = (std::complex<double> *)calloc(mpA*nqA,sizeof(std::complex<double>));
@@ -192,6 +199,8 @@ int main(int argc, char **argv){
             &ione, &ione, descZ, work, &lwork, rwork, &lrwork, &info);
     // fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);
+    int nout = 0;
+    // pclaprnt_(&n,&n, A, &ione, &ione, descA, 0,0, "Z", &nout, work, 1);
     MPIt2 = MPI_Wtime();
     MPIelapsed = MPIt2 - MPIt1;
 
@@ -201,40 +210,45 @@ int main(int argc, char **argv){
     std::memcpy(diagData->eig_v, Z, looptot*sizeof(std::complex<double>));
     
     // for (int i = 0; i < mpA; i++) {
-        // for (int j = 0; j < nqA; j++) {
-            // diagData->eig_v[(i*nqA)+j] = Z[(i*nqA)+j];
+    //     for (int j = 0; j < nqA; j++) {
+    //         diagData->eig_v[(i*nqA)+j] = Z[(i*nqA)+j];
             
-            // printf("[DIAGONALIZER] pe %d eig_v (%d,%d) %.8e %d, %d\n",
-            //   iam, i, j, Z[(i*nqA)+j].real(), myrow+1, mycol+1);
-        // }
-    // }
-    
-    //   for (int j = 0; j < nqA; j++) {
-    //     for (int i = 0; i < mpA; i++) {
-    //         // diagData->eig_v[(i*nqA)+j] = Z[(i*nqA)+j];
-    //         int global_tile_row = i / 20 + myrow;
-    //         int global_tile_col = j / 20 + mycol;
-    //         int global_row = i + global_tile_row * 20;
-    //         int global_col = j + global_tile_col * 20;
-    //         if (global_col == 0) {
-    //           printf("[DIAGONALIZER] pe %d eig_v (%d,%d) global (%d, %d) idx %d %.8e %d, %d\n",
-    //           iam, i, j, global_row, global_col, j, Z[(j*mpA)+i].real(), myrow+1, mycol+1);
-    //         }
-              
+    //         printf("[DIAGONALIZER] pe %d eig_v (%d,%d) %.8e %d, %d\n",
+    //           iam, i, j, Z[(i*nqA)+j].real(), myrow+1, mycol+1);
     //     }
     // }
-    diagData->eig_e = new std::complex<double>[min_mn];
-    std::memcpy(diagData->eig_e, A, min_mn*sizeof(std::complex<double>));
-    // if (iam == 0) {
-    //   for (int i = 0; i < min_mn; i++) {
-    //     // diagData->eig_e[i] = A[i];
-    //     printf("[DIAGONALIZER] eig_e %d %.8e %d, %d, %d\n",
-    //       i, W[i], myrow+1, mycol+1, iam);
-    //   }
-    // }
-
-    printf("n=%d\t(%d,%d)\t%d\tjobz=%c\t%8.2fs \n",
-      n, nprow, npcol, nb, jobz, MPIelapsed);
+    char fileName [255];
+    // int pe = myrow * nprow + mycol;
+    sprintf(fileName, "debug/eigv_q%d_%d.out", iternum, iam);
+    FILE* fp = fopen(fileName,"w");
+    for (int j = 0; j < nqA; j++) {
+      for (int i = 0; i < mpA; i++) {
+        // diagData->eig_v[(i*nqA)+j] = Z[(i*nqA)+j];
+        int global_tile_row = i / 20 + myrow;
+        int global_tile_col = j / 20 + mycol;
+        int global_row = i + global_tile_row * 20;
+        int global_col = j + global_tile_col * 20;
+        // if (global_col == 0) {
+          // printf("[DIAGONALIZER] pe %d eig_v (%d,%d) global (%d, %d) idx %d %.8e %d, %d\n",
+          // iam, i, j, global_row, global_col, j, Z[(j*mpA)+i].real(), myrow+1, mycol+1);
+        fprintf(fp, " %d %d %d %d %d %.8e %.8e %d %d\n",
+          iam, i, j, global_row, global_col, Z[(j*mpA)+i].real(), Z[(j*mpA)+i].imag(), myrow+1, mycol+1);
+        // }
+      }
+    }
+    fclose(fp);
+    diagData->eig_e = new double[min_mn];
+    std::memcpy(diagData->eig_e, W, min_mn*sizeof(double));
+    if (iam == 0) {
+      for (int i = 0; i < min_mn; i++) {
+        // diagData->eig_e[i] = A[i];
+        printf("[DIAGONALIZER] eig_e %d %.8e %d, %d, %d\n",
+          i, W[i], myrow+1, mycol+1, iam);
+      }
+    }
+    // kayahan debug
+    // printf("n=%d\t(%d,%d)\t%d\tjobz=%c\t%8.2fs \n",
+    //   n, nprow, npcol, nb, jobz, MPIelapsed);
     
     free(work);
     free(rwork);
@@ -242,6 +256,7 @@ int main(int argc, char **argv){
     free(Z);
     free(A);
     MPI_Barrier(MPI_COMM_WORLD);
+    
     restartCharm();
     MPI_Barrier(MPI_COMM_WORLD);
   }

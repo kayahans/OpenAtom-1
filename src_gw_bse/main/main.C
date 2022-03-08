@@ -58,7 +58,7 @@
 /* readonly */ CProxy_EpsMatrix s_matrix2D_proxy;
 
 // Epsilon matrices (Phase 3 & 4)
-/* readonly */ CProxy_Gpp gpp2D_proxy;
+/* readonly */ CProxy_Gpp gpp1D_proxy, gpp2D_proxy;
 //==========================================================================
 //cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 //==========================================================================
@@ -160,13 +160,14 @@ void Main::done() {
 
 
 void Main::restart_main(){
-  controller_proxy.gpp_complete();
+  controller_proxy.mpi_complete();
 }
 
 void restartCharm()
 {
   if(CkMyPe() == 0) {
-    CkPrintf("\nBack to charm\n");
+    // kayahan debug
+    // CkPrintf("\nBack to charm\n");
     mainProxy.restart_main();
   }
   StartCharmScheduler();

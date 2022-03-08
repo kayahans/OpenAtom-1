@@ -5,9 +5,10 @@ module psi_cache {
   nodegroup PsiCache {
     entry PsiCache();
     entry [exclusive] void receivePsi(PsiMessage*);
+    entry [exclusive] void send_rhodata(PsiMessage*);
     entry [exclusive] void computeFs(PsiMessage*);
     entry void reportFTime();
-    entry void setVCoulb(std::vector<double>, double);
+    entry void setVCoulb(std::vector<double>, double, std::vector<double> _ga, std::vector<double> _gb, std::vector<double>_gc, int ng);
     entry void setQIndex(int qindex);
     entry void reportInfo();
   };
