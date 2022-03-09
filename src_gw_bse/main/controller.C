@@ -13,6 +13,7 @@
 #include "CkLoopAPI.h"
 #include "limits.h"
 #include "diagonalizer.h"
+#include "../utils/windowing.h"
 
 #define eps_rows 20
 #define eps_cols 20
@@ -25,7 +26,7 @@ Controller::Controller() {
   GWBSE *gwbse = GWBSE::get();
   GW_SIGMA *gw_sigma = &(gwbse->gw_sigma);
   // Set our class variables
-  K = gwbse->gw_parallel.K;
+  K = gwbse->gw_parallel.K; // kpoints
   L = gwbse->gw_parallel.L;
   M = gwbse->gw_parallel.M;
 
@@ -146,14 +147,20 @@ void Controller::got_vcoulb(std::vector<double> vcoulb_in, double vcoulb0,
 }
 
 PsiCache::PsiCache() {
+  states_received = 0;
   GWBSE *gwbse = GWBSE::get();
   K = gwbse->gw_parallel.K;
   L = gwbse->gw_parallel.L;
+  M = gwbse->gw_parallel.M;
+  int M = gwbse->gw_parallel.M;
   GW_SIGMA *gw_sigma = &(gwbse->gw_sigma);
   n_np = gw_sigma->num_sig_matels;
   n_list = gw_sigma->n_list_sig_matels;
   np_list = gw_sigma->np_list_sig_matels;
   qindex = 0;
+  elements = 0;
+  int dim = gwbse->gw_parallel.n_elems/gwbse->gw_parallel.rows_per_chare;
+  total_elements = dim*dim;  
   if(gwbse->gw_parallel.n_qpt < K){
     qindex = gwbse->gw_parallel.Q[0];
   }
@@ -163,8 +170,8 @@ PsiCache::PsiCache() {
   received_chunks = 0;
   psis = new complex**[K];
   for (int k = 0; k < K; k++) {
-    psis[k] = new complex*[L];
-    for (int l = 0; l < L; l++) {
+    psis[k] = new complex*[L+M];
+    for (int l = 0; l < L+M; l++) {
       psis[k][l] = new complex[psi_size];
     }
   }
@@ -176,6 +183,10 @@ PsiCache::PsiCache() {
       psis_shifted[k][l] = new complex[psi_size];
     }
   }
+  int* nfft;
+  nfft = gwbse->gw_parallel.fft_nelems;
+
+  int ndata = nfft[0]*nfft[1]*nfft[2];  
   // 02.02.2022 Kayahan added GPP rhoData, stored at every node FFT in place
   int sigma_mode = gw_sigma->sigma_mode;
   if (sigma_mode == 1) {
@@ -194,6 +205,7 @@ PsiCache::PsiCache() {
   fsave = new complex[L*psi_size];
   f_nop = new complex[L*psi_size];
   states = new complex[K*2*n_np*psi_size];
+  P_m = new complex[ndata*ndata];
 
   umklapp_factor = new complex[psi_size];
 
@@ -204,8 +216,49 @@ PsiCache::PsiCache() {
   max_col = INT_MIN;
   tile_lock = CmiCreateLock();
 
+  lp = new LAPLACE(gwbse->gw_epsilon.Eocc, gwbse->gw_epsilon.Eunocc);
+  WIN = new WINDOWING(gwbse->gw_epsilon.Eocc, gwbse->gw_epsilon.Eunocc);
+  char fromFile[200];
+  Occ_occ = new double**[1];
+  Occ_unocc = new double**[1];
+  for (int s = 0; s < 1; s++) {
+    Occ_occ[s] = new double*[K];
+    Occ_unocc[s] = new double*[K];
+    for (int k = 0; k < K; k++) {
+      Occ_occ[s][k] = new double[L];
+      Occ_unocc[s][k] = new double[M];
+    }
+  }
+  for (int s = 0; s < 1; s++) {
+    for (int k = 0; k < K; k++) {
+      sprintf(fromFile, "./STATES/Spin.%d_Kpt.%d_Bead.0_Temper.0/%s",s,k,"occupations.in");
+      FILE* fp_occ = fopen(fromFile, "r");
+      if (fp_occ == NULL) {
+        PRINTF("Cannot open Occ Value File: %s\n", fromFile);
+        EXIT(1);
+      }
+      for (int i = 0; i < L; i++) {
+        fscanf(fp_occ,"%lg",&Occ_occ[s][k][i]);
+      }
+      for (int i = 0; i < M; i++) {
+        fscanf(fp_occ,"%lg",&Occ_unocc[s][k][i]);
+      }
+    }
+  } 
   total_time = 0.0;
   contribute(CkCallback(CkReductionTarget(Controller,psiCacheReady), controller_proxy));
+}
+
+double PsiCache::get_OccOcc(int k, int iv) {
+  return Occ_occ[0][k][iv];//tmp;
+}
+
+LAPLACE *PsiCache::getLP() {
+  return lp;
+}
+
+WINDOWING *PsiCache::getWin() {
+  return WIN;
 }
 
 void PsiCache::setQIndex(int q_index){
@@ -257,25 +310,35 @@ void PsiCache::reportFTime() {
 }
 
 void PsiCache::receivePsi(PsiMessage* msg) {
+
   if (msg->spin_index != 0) {
     CkAbort("Error: We don't support multiple spins yet!\n");
   }
   CkAssert(msg->k_index < K);
-  CkAssert(msg->state_index < L);
+  // CkAssert(msg->state_index < L);
   CkAssert(msg->size == psi_size);
   if(msg->shifted==false){std::copy(msg->psi, msg->psi+psi_size, psis[msg->k_index][msg->state_index]);}
-  if(msg->shifted==true){std::copy(msg->psi, msg->psi+psi_size, psis_shifted[msg->k_index][msg->state_index]);}
-  delete msg;
+    if(msg->shifted==true){std::copy(msg->psi, msg->psi+psi_size, psis[msg->k_index][msg->state_index]);}
+  fflush(stdout);
+  states_received++;
+#if 1
+  if(states_received == (L+M)*K) {
+  
+  // if(msg->shifted==true){std::copy(msg->psi, msg->psi+psi_size, psis_shifted[msg->k_index][msg->state_index]);}
+  // delete msg;
 
-  // Once the cache has received all of it's data start the sliding pipeline
-  // sending of psis to P to start the accumulation of fxf'.
-  int expected_psis = K*L;
-  if(qindex == 0)
-    expected_psis += K*L;
-  if (++received_psis == expected_psis) {
-    received_psis = 0;
-    //CkPrintf("[%d]: Cache filled\n", CkMyPe());
+  // // Once the cache has received all of it's data start the sliding pipeline
+  // // sending of psis to P to start the accumulation of fxf'.
+  // int expected_psis = K*L;
+  // if(qindex == 0)
+  //   expected_psis += K*L;
+  // if (++received_psis == expected_psis) {
+  //   received_psis = 0;
+  //   //CkPrintf("[%d]: Cache filled\n", CkMyPe());
     contribute(CkCallback(CkReductionTarget(Controller,cachesFilled), controller_proxy));
+#endif
+
+  delete msg;    
   }
 }
 
@@ -499,7 +562,13 @@ void PsiCache::computeFs(PsiMessage* msg) {
     int state_index = get_index(msg->state_index)*2*psi_size;
     complex *store_x = &states[(msg->k_index*2*n_np*psi_size)+ state_index];
     complex *load_x = msg->psi;
-    memcpy(store_x, load_x, psi_size*sizeof(complex));
+    // memcpy(store_x, load_x, psi_size*sizeof(complex));
+    int k = 0;
+    for (int i = 0; i < regions.size(); i++) {
+      for (int j = regions[i].first; j < regions[i].second; j++) {
+        store_x[k++] = load_x[j];
+      }
+    }    
   }
 #endif
 

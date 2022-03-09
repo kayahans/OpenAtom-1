@@ -27,10 +27,10 @@ extern "C" {
   void pdsyev_(char *jobz, char *uplo, int *n, double *a, int *ia, int *ja,
                   int *desca, double *w, double *z, int *iz, int *jz, int *descz,
                   double *work, int *lwork, int *info);
-  void pclaprnt_( int * m, int * n, std::complex<double> * A, int * ia, int * ja,
+  void pzlaprnt_(int * m, int * n, std::complex<double> * A, int * ia, int * ja,
 		  int * desca, int * irprnt, int * icprn, char * cmatnm,
 		  int * nout,
-		  std::complex<double> * work, int);
+		  std::complex<double> * work);
 }
 
 static int max(int a, int b) {
@@ -199,8 +199,9 @@ int main(int argc, char **argv){
             &ione, &ione, descZ, work, &lwork, rwork, &lrwork, &info);
     // fflush(stdout);
     MPI_Barrier(MPI_COMM_WORLD);
-    int nout = 0;
-    // pclaprnt_(&n,&n, A, &ione, &ione, descA, 0,0, "Z", &nout, work, 1);
+    int nout = 6;
+    char cnat = 'Z';
+    // pzlaprnt_(&n,&n, Z, &ione, &ione, descZ, &izero,&izero, &cnat, &nout, work);
     MPIt2 = MPI_Wtime();
     MPIelapsed = MPIt2 - MPIt1;
 
@@ -221,8 +222,9 @@ int main(int argc, char **argv){
     // int pe = myrow * nprow + mycol;
     sprintf(fileName, "debug/eigv_q%d_%d.out", iternum, iam);
     FILE* fp = fopen(fileName,"w");
-    for (int j = 0; j < nqA; j++) {
-      for (int i = 0; i < mpA; i++) {
+    int k = 0;
+    for (int i = 0; i < mpA; i++) {
+      for (int j = 0; j < nqA; j++) {
         // diagData->eig_v[(i*nqA)+j] = Z[(i*nqA)+j];
         int global_tile_row = i / 20 + myrow;
         int global_tile_col = j / 20 + mycol;
@@ -231,21 +233,25 @@ int main(int argc, char **argv){
         // if (global_col == 0) {
           // printf("[DIAGONALIZER] pe %d eig_v (%d,%d) global (%d, %d) idx %d %.8e %d, %d\n",
           // iam, i, j, global_row, global_col, j, Z[(j*mpA)+i].real(), myrow+1, mycol+1);
+        // fprintf(fp, " %d %d %d %d %d %.8e %.8e %d %d\n",
+        //   iam, i, j, global_row, global_col, Z[(j*mpA)+i].real(), Z[(j*mpA)+i].imag(), myrow+1, mycol+1);
         fprintf(fp, " %d %d %d %d %d %.8e %.8e %d %d\n",
           iam, i, j, global_row, global_col, Z[(j*mpA)+i].real(), Z[(j*mpA)+i].imag(), myrow+1, mycol+1);
-        // }
+        //   k++;
+        // // }
       }
     }
+
     fclose(fp);
     diagData->eig_e = new double[min_mn];
     std::memcpy(diagData->eig_e, W, min_mn*sizeof(double));
-    if (iam == 0) {
-      for (int i = 0; i < min_mn; i++) {
-        // diagData->eig_e[i] = A[i];
-        printf("[DIAGONALIZER] eig_e %d %.8e %d, %d, %d\n",
-          i, W[i], myrow+1, mycol+1, iam);
-      }
-    }
+    // if (iam == 0) {
+    //   for (int i = 0; i < min_mn; i++) {
+    //     // diagData->eig_e[i] = A[i];
+    //     printf("[DIAGONALIZER] eig_e %d %.8e %d, %d, %d\n",
+    //       i, W[i], myrow+1, mycol+1, iam);
+    //   }
+    // }
     // kayahan debug
     // printf("n=%d\t(%d,%d)\t%d\tjobz=%c\t%8.2fs \n",
     //   n, nprow, npcol, nb, jobz, MPIelapsed);

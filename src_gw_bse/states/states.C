@@ -66,20 +66,38 @@ States::States(CkMigrateMessage *msg) { }
 void States::sendToCache() {
   //CkPrintf("[%i,%i,%i]: Sending psi to node cache...\n", ispin, ikpt, istate);
   int ndata = nfft[0]*nfft[1]*nfft[2];
-  PsiMessage* msg = new (ndata) PsiMessage(ndata, stateCoeffR);
-  msg->spin_index = ispin;
-  msg->k_index = ikpt;
-  msg->state_index = istate;
-  msg->shifted = false;
-  psi_cache_proxy.receivePsi(msg);
-
-  if(qindex == 0){
+  PsiMessage* msg;
+  if(istate >= nocc) {
+    msg = new (ndata) PsiMessage(ndata, stateCoeffR);
+    msg->spin_index = ispin;
+    msg->k_index = ikpt;
+    msg->state_index = istate;
+    msg->shifted = false;
+    psi_cache_proxy.receivePsi(msg);
+  }
+  if(qindex == 0 && istate < nocc){ //Shifted states - i think
+#if 1
     msg = new (ndata) PsiMessage(ndata, stateCoeffR_shifted);
     msg->spin_index = ispin;
     msg->k_index = ikpt;
     msg->state_index = istate;
     msg->shifted = true;
     psi_cache_proxy.receivePsi(msg);
+#endif  
+//   PsiMessage* msg = new (ndata) PsiMessage(ndata, stateCoeffR);
+//   msg->spin_index = ispin;
+//   msg->k_index = ikpt;
+//   msg->state_index = istate;
+//   msg->shifted = false;
+//   psi_cache_proxy.receivePsi(msg);
+
+//   if(qindex == 0){
+//     msg = new (ndata) PsiMessage(ndata, stateCoeffR_shifted);
+//     msg->spin_index = ispin;
+//     msg->k_index = ikpt;
+//     msg->state_index = istate;
+//     msg->shifted = true;
+//     psi_cache_proxy.receivePsi(msg);
   }
 }
 
@@ -164,6 +182,8 @@ void States::fftGtoR(int q_index) {
     fftbox_to_array(ndata, out_pointer, stateCoeffR_shifted, scale);
 //    delete [] stateCoeff_shifted;
   }
+  GWBSE *gwbse = GWBSE::get();
+  int L = gwbse->gw_parallel.L;
 
   // delete space used for fftidx
   for (int i = 0; i < numCoeff; i++) { delete [] fftidx[i]; }

@@ -25,11 +25,13 @@ class GW_EPSILON{
     double*** Eocc;              // Eigenvalues for occupied states
     double*** Eocc_shifted;      // Eigenvalues for shifted occupied states
     double*** Eunocc;            // Eigenvalues for unoccupied states
+    double*** Occ_occ;
+    double*** Occ_unocc;
     double EcutFFT;              // Num: Energy cutoff for FFT (Rydberg)
     double Ecuteps;              // Num: Epsilon matrix cutoff (Rydberg)
     double tol_iter;             // Num: Tolerance of the iterative matrix inversion method
     char eigFileName[200];       // No need to pup this, contents stored in Eocc and Eunocc
-
+    char occFileName[200];
     //----------------
     //con-destruct:
     GW_EPSILON(){
@@ -40,6 +42,8 @@ class GW_EPSILON{
       nunocc = 0;
       Eocc = NULL;
       Eunocc = NULL;
+      Occ_occ = NULL;
+      Occ_unocc = NULL;
     };
     ~GW_EPSILON(){};
 
@@ -61,14 +65,20 @@ class GW_EPSILON{
         Eocc = new double**[nspin];
         Eocc_shifted = new double**[nspin];
         Eunocc = new double**[nspin];
+        Occ_occ = new double**[nspin];
+        Occ_unocc = new double**[nspin];
         for (int s = 0; s < nspin; s++) {
           Eocc[s] = new double*[nkpt];
           Eocc_shifted[s] = new double*[nkpt];
           Eunocc[s] = new double*[nkpt];
+          Occ_occ[s] = new double*[nkpt];
+          Occ_unocc[s] = new double*[nkpt];
           for (int k = 0; k < nkpt; k++) {
             Eocc[s][k] = new double[nocc];
             Eocc_shifted[s][k] = new double[nocc];
             Eunocc[s][k] = new double[nunocc];
+            Occ_occ[s][k] = new double[nunocc];
+            Occ_unocc[s][k] = new double[nunocc];
           }
         }
       }
@@ -77,6 +87,8 @@ class GW_EPSILON{
           PUParray(p, Eocc[s][k], nocc);
           PUParray(p, Eocc_shifted[s][k], nocc);
           PUParray(p, Eunocc[s][k], nunocc);
+          PUParray(p, Occ_occ[s][k], nunocc);
+          PUParray(p, Occ_unocc[s][k], nunocc);
         }
       }
       

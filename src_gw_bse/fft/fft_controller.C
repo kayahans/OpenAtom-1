@@ -202,6 +202,7 @@ void FFTController:: calc_vcoulb(double* qvec, double* a1, double* a2, double* a
   controller_proxy.got_vcoulb(vcoulb_v, vcoulb0, ga, gb, gc, geps->ng);
 }
 
+
 void FFTController::get_geps(double epsCut, double* qvec, double* b1, double* b2, double * b3, 
                               double alat, int nfft[3]){
 
@@ -297,6 +298,7 @@ void FFTController::get_geps(double epsCut, double* qvec, double* b1, double* b2
     delete[] gy;
     delete[] gz;
 
+    
     std::vector<int> accept_v;
     std::vector<int> geps_x(eps_size);
     std::vector<int> geps_y(eps_size);

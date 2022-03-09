@@ -16,6 +16,9 @@ module pmatrix {
     entry void fftRows(int);
     entry void generateEpsilon(CProxy_EpsMatrix proxy, std::vector<int> accept);
     entry void registerTileSections();
+    entry void computeP();
+    entry void sigma_init(std::vector<int> accept);
+    entry void sigma();
 
     // SDAG code for doing the transpose
     entry [reductiontarget] void start_iteration();
@@ -98,7 +101,7 @@ module pmatrix {
       }
       serial {
         iteration = 0;//re-initializing for later re-use
-        contribute(CkCallback(CkReductionTarget(Controller, transposeComplete), controller_proxy));
+        // contribute(CkCallback(CkReductionTarget(Controller, transposeComplete), controller_proxy));
       }
     }
   };
