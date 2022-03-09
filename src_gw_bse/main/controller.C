@@ -217,7 +217,7 @@ PsiCache::PsiCache() {
   tile_lock = CmiCreateLock();
 
   lp = new LAPLACE(gwbse->gw_epsilon.Eocc, gwbse->gw_epsilon.Eunocc);
-  WIN = new WINDOWING(gwbse->gw_epsilon.Eocc, gwbse->gw_epsilon.Eunocc);
+  // WIN = new WINDOWING(gwbse->gw_epsilon.Eocc, gwbse->gw_epsilon.Eunocc);
   char fromFile[200];
   Occ_occ = new double**[1];
   Occ_unocc = new double**[1];
@@ -229,6 +229,7 @@ PsiCache::PsiCache() {
       Occ_unocc[s][k] = new double[M];
     }
   }
+  // CkPrintf("Reading occupations\n");
   for (int s = 0; s < 1; s++) {
     for (int k = 0; k < K; k++) {
       sprintf(fromFile, "./STATES/Spin.%d_Kpt.%d_Bead.0_Temper.0/%s",s,k,"occupations.in");
@@ -321,6 +322,7 @@ void PsiCache::receivePsi(PsiMessage* msg) {
     if(msg->shifted==true){std::copy(msg->psi, msg->psi+psi_size, psis[msg->k_index][msg->state_index]);}
   fflush(stdout);
   states_received++;
+  // printf("recv %d target %d\n", states_received, (L+M)*K);
 #if 1
   if(states_received == (L+M)*K) {
   

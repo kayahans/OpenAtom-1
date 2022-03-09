@@ -151,24 +151,27 @@ module controller {
         #endif
 #if 1        
         for (next_K = 0; next_K < K; next_K++) {
-          for (next_state = 0; next_state < L; next_state++) {
+          for (next_state = 0; next_state < L+M; next_state++) {
             states_proxy(0, next_K, next_state).sendToCache();
             fflush(stdout);
           }
         }
 #endif
-#if 1
-        for (next_K = 0; next_K < K; next_K++) {
-          for (next_state = L; next_state < L+M; next_state++) {
-            states_proxy(0, next_K, next_state).sendToCache();
-          }
-        }
-#endif        
+// #if 1
+//         for (next_K = 0; next_K < K; next_K++) {
+//           for (next_state = L; next_state < L+M; next_state++) {
+//             states_proxy(0, next_K, next_state).sendToCache();
+//           }
+//         }
+// #endif
       }
       // when fCacheReady(), cachesFilled(), registrationComplete() serial {
       //   psi_cache_proxy.reportInfo();
       //   STOP_BIG_STEP("SETUP COMPLETED");
       // }
+      serial {
+        START_STEP("P MATRIX FORMED");
+      }
       when cachesFilled() serial {
         pmatrix2D_proxy.computeP();
       }
@@ -281,7 +284,7 @@ module controller {
           }
         }
       }
-    when fCacheReady(), cachesFilled(), registrationComplete() serial {
+    when fCacheReady(), registrationComplete() serial {
         psi_cache_proxy.reportInfo();
         STOP_BIG_STEP("SETUP COMPLETED");
       }

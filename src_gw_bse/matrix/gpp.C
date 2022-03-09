@@ -459,18 +459,18 @@ void Gpp::print(int qindex, int fnum) {
 }
 void Gpp::debug() {
   int mype = CkMyPe();
-  // int r = config.tile_rows;
-  // int c = config.tile_cols;
-  // if (thisIndex.x == thisIndex.y) {
-  //   int start_index = 0;
-  //   int end_index = 10;
-  //   for (int i = start_index; i < end_index; i++ ) {
-  //     for (int j = start_index; j < end_index; j++ ) {
-  //       printf("GPP Print %f\n", data[IDX_eps(i, j)].re);
-  //     }
-  //   }
-  // }
-  // CkPrintf("[GPP] pe %d r %d c %d\n", mype, r, c);
+  int r = config.tile_rows;
+  int c = config.tile_cols;
+  if (thisIndex.x == thisIndex.y) {
+    int start_index = 0;
+    int end_index = 10;
+    for (int i = start_index; i < end_index; i++ ) {
+      for (int j = start_index; j < end_index; j++ ) {
+        printf("GPP Print %f\n", data[IDX_eps(i, j)].re);
+      }
+    }
+  }
+  CkPrintf("[GPP] pe %d r %d c %d\n", mype, r, c);
   contribute(CkCallback(CkReductionTarget(Controller, gpp_debug_complete), controller_proxy));
 }
 

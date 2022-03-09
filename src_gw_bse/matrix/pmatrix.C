@@ -467,8 +467,10 @@ void PMatrix::PerformPPEnergySumThisNode(const int is,
   PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
 
 
-  double* const gpp_eig  = psi_cache->get_gpp_eig();
-  double* const gpp_omsq = psi_cache->get_gpp_omsq();
+  // double* const gpp_eig; // TODO  = psi_cache->get_gpp_eig();
+  // double* const gpp_omsq; // TODO = psi_cache->get_gpp_omsq();
+  double*  gpp_eig;
+  double*  gpp_omsq;
 
   const double tau_u     = winpair.nodes[inode];
   const double zeta      = winpair.zeta;  // 1.0 / sqrt(winpair.gap * winpair.bw);
@@ -497,7 +499,7 @@ void PMatrix::PerformPPEnergySumThisNode(const int is,
         }  // end if
       }  // end if
 
-      complex* const B_r = psi_cache->get_gpp_br(pp_idx[j]);
+      complex* B_r; // TODO = psi_cache->get_gpp_br(pp_idx[j]);
 
 #ifdef USE_LAPACK
       char transformT = 'C';
@@ -580,7 +582,7 @@ void PMatrix::PerformStateSumThisNode(const int& is,
 }
 
 
-void PMatrix::compute_fr(complex* fr, const std::complex<double>* psikq, const int uklpp[3]){
+void PMatrix::compute_fr(complex* fr, complex* psikq, const int uklpp[3]){
   // set f_r
   for(int i=0; i<tile_size; i++){
       fr[i] = psikq[i];
@@ -588,7 +590,7 @@ void PMatrix::compute_fr(complex* fr, const std::complex<double>* psikq, const i
   // Need to modify psikq if umklapp vector is not zero
   if( uklpp[0]!=0 || uklpp[1]!=0 || uklpp[2]!=0 ){
     complex* psikq_tmp[tile_size];
-    modify_state_Uproc(fr, uklpp, nfft, sys);
+    // TODO modify_state_Uproc(fr, uklpp, nfft, sys);
   }
 }
 
@@ -598,7 +600,7 @@ void PMatrix::sigma_cubic_main(std::complex<double>* sigma,
                               const double& w,
                               const std::vector<std::pair<int, int>>& n12,
                               const bool& bIsOccupied,
-                              WINDOWING* WIN) {
+                              WINDOWING& WIN) {
   GWBSE *gwbse = GWBSE::get();
   
   PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
@@ -612,8 +614,8 @@ void PMatrix::sigma_cubic_main(std::complex<double>* sigma,
     unsigned ikq;
     int umklapp[3];
     kqIndex(ik, ikq, umklapp);
-    double* gpp_eig  = psi_cache->get_gpp_eig();
-    double* gpp_omsq = psi_cache->get_gpp_omsq();
+    double* gpp_eig; // TODO = psi_cache->get_gpp_eig();
+    double* gpp_omsq; // TODO = psi_cache->get_gpp_omsq();
     std::vector<double> psi_eig;// shifted state eigenvalues
     double* _eig_occ = e_occ[is][ikq];
     double* _eig_unocc = e_unocc[is][ikq];
@@ -624,10 +626,10 @@ void PMatrix::sigma_cubic_main(std::complex<double>* sigma,
     int state_end_index = nocc;
     if (!bIsOccupied) {
       state_start_index = nocc;
-      state_end_index   = opts.nstateCh;  // TODO (kayahans)
+      state_end_index   = nunocc; // opts.nstateCh;  // TODO (kayahans)
     }
     // 2. loop over window pairs
-    for (WINPAIR winpair : WIN->winpairs) {
+    for (WINPAIR winpair : WIN.winpairs) {
       std::vector<double> state_e;  // E_v - w or w - E_c
       std::vector<double> pp_wp;     // PP energies w
       std::vector<int> state_idx;   // indexes of the state psi in window
@@ -656,6 +658,7 @@ void PMatrix::sigma_cubic_main(std::complex<double>* sigma,
       double wp = 0;
       int ipp = 0;
       window_index = 1;
+      int ndata = nfft[0] * nfft[1] * nfft[2];
       for (int i_ndata = 0; i_ndata < ndata; i_ndata++) {
         if (accept[i_ndata]) {
           wpsq = gpp_omsq[ipp];
@@ -685,27 +688,30 @@ void PMatrix::sigma_cubic_main(std::complex<double>* sigma,
       // we use zeta = - winpair.zeta;
 
       if (state_e.size() > 0 && pp_wp.size() > 0) {
-        cubic_sigma_per_window(is, ik, iq, ikq, winpair, state_e, state_idx, pp_wp, pp_idx, uklpp);
+        cubic_sigma_per_window(is, ik, iq, ikq, winpair, state_e, state_idx, pp_wp, pp_idx, umklapp);
       }
     }  // end winpair loop
-    delete[] accept;
   }  // end q-loop
   // \sum_q \Sigma(w)rr'^q is calculated above
   // Now calculate <n1|\sum_q\Sigma(w)rr'^q|n2>
   int i = 0;
   for (std::pair<int, int> in12 : n12) {
-    std::complex<double>* psiRk_n1  = WFN.psiR[is][ik]->coeff[in12.first];
-    std::complex<double>* psiRk_n2  = WFN.psiR[is][ik]->coeff[in12.second];
+    complex psiRk_n1[psi_ndata_local];
+    complex psiRk_n2[psi_ndata_local];
+    for (int i=0; i<psi_ndata_local; i++){
+      psiRk_n1[i] = psi_cache->psis[ik][in12.first][region_ridx*psi_ndata_local + i];
+      psiRk_n2[i] = psi_cache->psis[ik][in12.second][region_cidx*psi_ndata_local + i];
+    }
     char transformT = 'C';
     char transform  = 'N';
     int    Lone   = 1;
     double beta   = 0.0;
     double factor = 1.0;
-    std::complex<double> sigma_n2[ndata] = {0.0};
-    std::complex<double> n1_sigma_n2[1]  = {0.0};
-    myGEMM(&transform,  &transform, &ndata, &Lone, &ndata, &factor, sigma_m, &ndata, psiRk_n2, &ndata, &beta, sigma_n2, &ndata);
-    myGEMM(&transformT, &transform, &Lone,  &Lone, &ndata, &factor, psiRk_n1, &ndata, sigma_n2, &ndata, &beta, n1_sigma_n2, &Lone);
-    sigma[i] = n1_sigma_n2[0].real();
+    complex sigma_n2[tile_size] = {0.0};
+    complex n1_sigma_n2[1]  = {0.0};
+    myGEMM(&transform,  &transform, &psi_ndata_local, &Lone, &psi_ndata_local, &factor, sigma_m, &psi_ndata_local, psiRk_n2, &psi_ndata_local, &beta, sigma_n2, &psi_ndata_local);
+    myGEMM(&transformT, &transform, &Lone,  &Lone, &psi_ndata_local, &factor, psiRk_n1, &psi_ndata_local, sigma_n2, &psi_ndata_local, &beta, n1_sigma_n2, &Lone);
+    sigma[i] = n1_sigma_n2[0].re;
     i++;
   }
 }
@@ -723,14 +729,15 @@ void PMatrix::cubicSigma(const int& is,
   // This can ideally be done only once
   PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
   WINDOWING* WIN = psi_cache->getWin();
-  std::vector<double> omsq = psi_cache->get_omsq();
-  WIN->sigma_win(w, omsq, omsq.size());
+  double*** omsq; // TODO = psi_cache->get_omsq();
+  int* ng; // TODO
+  WIN->sigma_win(w, omsq, ng);
   WIN->searchwins("Sigma"); // on the fly windowing optimization
 
   std::complex<double>* sigma_plus = new std::complex<double>[n12_size];
   std::complex<double>* sigma_minus = new std::complex<double>[n12_size];
-  sigma_cubic_main(sigma_plus, is, ik, w, n12, positive, *WIN);
-  sigma_cubic_main(sigma_minus, is, ik, w, n12, !positive, *WIN);
+  // sigma_cubic_main(sigma_plus, is, ik, w, n12, positive, WIN);
+  // sigma_cubic_main(sigma_minus, is, ik, w, n12, !positive, WIN);
 }
 
 void PMatrix::sigma() {

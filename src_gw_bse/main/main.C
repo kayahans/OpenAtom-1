@@ -94,12 +94,11 @@ Main::Main(CkArgMsg* msg) {
 
   // -------------------------------------------------------------------
   // Create the controller chares
-  controller_proxy = CProxy_Controller::ckNew(0);
+  controller_proxy = CProxy_Controller::ckNew(0); 
   fft_controller_proxy = CProxy_FFTController::ckNew();
   psi_cache_proxy = CProxy_PsiCache::ckNew();
   fvector_cache_proxy = CProxy_FVectorCache::ckNew();
   diag_bridge_proxy = CProxy_DiagBridge::ckNew();
-  // gpp2D_proxy = CProxy_Gpp::ckNew();
   mat_mul_proxy    = CProxy_MatMul::ckNew();
 
   // -------------------------------------------------------------------

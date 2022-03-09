@@ -90,7 +90,7 @@ class PMatrix : public CBase_PMatrix {
                                     const bool& IsFirstHGL,
                                     const int uklpp[3]);
 
-    void compute_fr(complex* fr, const std::complex<double>* psikq, const int uklpp[3]);
+    void compute_fr(complex* fr, complex* psikq, const int uklpp[3]);
     void sigma_cubic_main(std::complex<double>* sigma,
                               const int& is,
                               const int& ik,
