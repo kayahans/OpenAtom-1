@@ -22,9 +22,13 @@ class PMatrix : public CBase_PMatrix {
     void applyFs();
     void calc_vcoulb();
     void calc_Eps(Phase3Message* msg);
+<<<<<<< HEAD
     void computeP();
     void sigma();
     void sigma_init(std::vector<int> accept);
+=======
+    void compute();
+>>>>>>> 9ab764b950b6e34c8aa5502e89fd2509923171e4
 
     void reportPTime();
     void generateEpsilon(std::vector<double> vcoulb, std::vector<int> accept, int inew, int jnew, int size, int max_inew, int max_jnew);   
@@ -37,7 +41,11 @@ class PMatrix : public CBase_PMatrix {
     int* nfft; // number of fft grids in each direction
     unsigned qindex;
     int psi_ndata_local;
+<<<<<<< HEAD
     int tile_size;
+=======
+    int psi2_ndata_local;
+>>>>>>> 9ab764b950b6e34c8aa5502e89fd2509923171e4
     int region_ridx;
     int region_cidx;
     FFTController* fft_controller;
