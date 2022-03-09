@@ -476,7 +476,7 @@ void PMatrix::PerformPPEnergySumThisNode(const int is,
   const double wp_min    = winpair.w2[0];
   const int Nb           = pp_idx.size();
 
-  for (int j = 0; j < Nb; j++) {
+  for (int j = 0; j < Nb; j++) { 
     double omsq_j = gpp_omsq[pp_idx[j]];
     // if (1) {
     if (omsq_j > 0) {
@@ -505,7 +505,7 @@ void PMatrix::PerformPPEnergySumThisNode(const int is,
       int Lone        = 1;
       double one    = 1.0;
       
-      myGEMM(&transform, &transformT, &tile_size, &tile_size, &Lone,  &factor, B_r, &ndata, B_r, &tile_size, &one, B_m, &tile_size);
+      myGEMM(&transform, &transformT, &tile_size, &tile_size, &Lone,  &factor, B_r, &tile_size, B_r, &tile_size, &one, B_m, &tile_size);
 #else
     Die("Without -DUSE_LAPACK flag, polarizability calculation does not work!");
 #endif
@@ -525,9 +525,7 @@ void PMatrix::PerformStateSumThisNode(const int& is,
                                     const int uklpp[3]) {
   assert(state_e.size() == state_idx.size());
   PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
-  // std::complex<double>* psiRk_n1  = WFN.psiR[is][ik]->coeff[n1];
-  // std::complex<double>* psiRk_n2  = WFN.psiR[is][ik]->coeff[n2];
-
+  
   double tau_u      = winpair.nodes[inode];
   double zeta       = winpair.zeta;
   double gamma      = winpair.gamma;
@@ -600,9 +598,13 @@ void PMatrix::sigma_cubic_main(std::complex<double>* sigma,
                               const double& w,
                               const std::vector<std::pair<int, int>>& n12,
                               const bool& bIsOccupied,
-                              WINDOWING& WIN) {
-  int nq = nkpt;  // (kayahans FIXME)
+                              WINDOWING* WIN) {
+  GWBSE *gwbse = GWBSE::get();
+  
   PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
+  int nq = gwbse->gw_parallel.K; // for now nq = nkpt TODO kayahans hardcoded
+  int nunocc = gwbse->gw_parallel.M;
+  int nocc = gwbse->gw_parallel.L;
   double*** e_occ = gwbse->gw_epsilon.Eocc;
   double*** e_unocc = gwbse->gw_epsilon.Eunocc;
   // 1. Loop over q-points
@@ -619,13 +621,13 @@ void PMatrix::sigma_cubic_main(std::complex<double>* sigma,
     std::copy(_eig_unocc, _eig_unocc+nunocc, back_inserter(psi_eig));
 
     int state_start_index = 0;
-    int state_end_index = sys.nocc;
+    int state_end_index = nocc;
     if (!bIsOccupied) {
-      state_start_index = sys.nocc;
-      state_end_index   = opts.nstateCh;
+      state_start_index = nocc;
+      state_end_index   = opts.nstateCh;  // TODO (kayahans)
     }
     // 2. loop over window pairs
-    for (WINPAIR winpair : WIN.winpairs) {
+    for (WINPAIR winpair : WIN->winpairs) {
       std::vector<double> state_e;  // E_v - w or w - E_c
       std::vector<double> pp_wp;     // PP energies w
       std::vector<int> state_idx;   // indexes of the state psi in window
@@ -655,7 +657,7 @@ void PMatrix::sigma_cubic_main(std::complex<double>* sigma,
       int ipp = 0;
       window_index = 1;
       for (int i_ndata = 0; i_ndata < ndata; i_ndata++) {
-        if (acceptEps[i_ndata]) {
+        if (accept[i_ndata]) {
           wpsq = gpp_omsq[ipp];
           wp = sqrt(wpsq);
           // Select w2>0 windows only!
@@ -686,9 +688,7 @@ void PMatrix::sigma_cubic_main(std::complex<double>* sigma,
         cubic_sigma_per_window(is, ik, iq, ikq, winpair, state_e, state_idx, pp_wp, pp_idx, uklpp);
       }
     }  // end winpair loop
-    delete g;
     delete[] accept;
-    delete[] acceptEps;
   }  // end q-loop
   // \sum_q \Sigma(w)rr'^q is calculated above
   // Now calculate <n1|\sum_q\Sigma(w)rr'^q|n2>
@@ -703,43 +703,43 @@ void PMatrix::sigma_cubic_main(std::complex<double>* sigma,
     double factor = 1.0;
     std::complex<double> sigma_n2[ndata] = {0.0};
     std::complex<double> n1_sigma_n2[1]  = {0.0};
-    myGEMM(&transform,  &transform, &ndata, &Lone, &ndata, &factor, sigmat->m, &ndata, psiRk_n2, &ndata, &beta, sigma_n2, &ndata);
+    myGEMM(&transform,  &transform, &ndata, &Lone, &ndata, &factor, sigma_m, &ndata, psiRk_n2, &ndata, &beta, sigma_n2, &ndata);
     myGEMM(&transformT, &transform, &Lone,  &Lone, &ndata, &factor, psiRk_n1, &ndata, sigma_n2, &ndata, &beta, n1_sigma_n2, &Lone);
     sigma[i] = n1_sigma_n2[0].real();
     i++;
   }
 }
 
-void PMatrix::cubicSigma(std::complex<double> w,
-                        const int& is,
+void PMatrix::cubicSigma(const int& is,
                         const int& ik,
                         const SIGMAINDICES& iwn12
                         ) {
   double totsum = 0;
   const bool positive(true);
-  const double w = iwn12.w;
   const std::vector<std::pair<int, int>> n12 = iwn12.n12;
-  int n12_size = n12.size();
-  
+  const int n12_size = n12.size();
+  const double w = iwn12.w;
+
   // This can ideally be done only once
   PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
-  WINDOWING WIN = psi_cache->getWin();
+  WINDOWING* WIN = psi_cache->getWin();
   std::vector<double> omsq = psi_cache->get_omsq();
-  WIN.sigma_win(w, omsq, omsq->size());
-  WIN.searchwins("Sigma"); // on the fly windowing optimization
+  WIN->sigma_win(w, omsq, omsq.size());
+  WIN->searchwins("Sigma"); // on the fly windowing optimization
 
   std::complex<double>* sigma_plus = new std::complex<double>[n12_size];
   std::complex<double>* sigma_minus = new std::complex<double>[n12_size];
-  sigma_cubic_main(sigma_plus, is, ik, w, n12, positive, WIN);
-  sigma_cubic_main(sigma_minus, is, ik, w, n12, !positive, WIN);
+  sigma_cubic_main(sigma_plus, is, ik, w, n12, positive, *WIN);
+  sigma_cubic_main(sigma_minus, is, ik, w, n12, !positive, *WIN);
 }
 
 void PMatrix::sigma() {
   GWBSE *gwbse = GWBSE::get();
+  PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
   // Sigma parameters mtxels, w should later be read from input
   int nkpt = gwbse->gw_parallel.K;
   int nspin = 1; // TODO (kayahans) hardcoded
-  std::complex<double> w = 1.000;
+  double w = 1.000;
   std::vector<SIGMAINDICES> sigma_index_list;
   SIGMAINDICES n44(w, 4,4);
   SIGMAINDICES n55(w, 5,5);
@@ -768,7 +768,7 @@ void PMatrix::sigma() {
   // Calculate sigma
   for(int ik = 0; ik<nkpt; ik++) {
     for(int is = 0; is<nspin; is++) {
-      cubicSigma(w, is, ik, sigma_index_list);
+      cubicSigma(is, ik, n44);
     }
   }
 }

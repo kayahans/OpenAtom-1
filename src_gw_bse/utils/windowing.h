@@ -108,7 +108,7 @@ class WINDOWING {
     GWBSE *gwbse = GWBSE::get();
     int nocc = gwbse->gw_parallel.L;
     int nunocc = gwbse->gw_parallel.M;
-    int nspin = 1; // TODO (kayahans) hardcoded
+    int nspin = 1; 
     int nkpt = gwbse->gw_parallel.K;
     initialize(e_occ, e_unocc, nocc,nunocc, nspin, nkpt);
   }

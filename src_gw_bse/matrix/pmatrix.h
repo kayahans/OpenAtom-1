@@ -66,13 +66,13 @@ class PMatrix : public CBase_PMatrix {
                                     const int iq,
                                     const int ikq,
                                     const WINPAIR& winpair,
-                                    const bool* acceptEps,
                                     const std::vector<double>& state_e,
                                     const std::vector<int>& state_idx,
                                     const std::vector<double>& pp_e,
                                     const std::vector<int>& pp_idx,
                                     const int uklpp[3]);
-    void PerformPPEnergySumThisNode(const bool* acceptEps,
+    void PerformPPEnergySumThisNode(const int is,
+                                        const int iq,
                                         const std::vector<double>& pp_wp,
                                         const std::vector<int>& pp_idx,
                                         const WINPAIR& winpair,
@@ -90,7 +90,7 @@ class PMatrix : public CBase_PMatrix {
                                     const bool& IsFirstHGL,
                                     const int uklpp[3]);
 
-    void compute_fr(std::complex<double>* fr, const std::complex<double>* psikq, const int uklpp[3]);
+    void compute_fr(complex* fr, const std::complex<double>* psikq, const int uklpp[3]);
     void sigma_cubic_main(std::complex<double>* sigma,
                               const int& is,
                               const int& ik,
@@ -98,10 +98,9 @@ class PMatrix : public CBase_PMatrix {
                               const std::vector<std::pair<int, int>>& n12,
                               const bool& bIsOccupied,
                               WINDOWING& WIN);
-    void cubicSigma(std::complex<double> w,
-                        const int& is,
-                        const int& ik,
-                        const SIGMAINDICES& iwn12);
+    void cubicSigma(const int& is,
+                    const int& ik,
+                    const SIGMAINDICES& iwn12);
     double total_time;
 };
 
