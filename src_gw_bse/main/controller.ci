@@ -170,11 +170,7 @@ module controller {
       //   STOP_BIG_STEP("SETUP COMPLETED");
       // }
       when cachesFilled() serial {
-<<<<<<< HEAD
         pmatrix2D_proxy.computeP();
-=======
-        pmatrix2D_proxy.compute();
->>>>>>> 9ab764b950b6e34c8aa5502e89fd2509923171e4
       }
 
       when newPMatrixComplete() serial {

@@ -37,11 +37,7 @@ PMatrix::PMatrix(MatrixConfig config) : CBase_PMatrix(config) {
   total_time = 0.0;
 }
 
-<<<<<<< HEAD
 void PMatrix::computeP() {
-=======
-void PMatrix::compute() {
->>>>>>> 9ab764b950b6e34c8aa5502e89fd2509923171e4
 //if(!(thisIndex.x==0 && thisIndex.y==0)) return;
   GWBSE *gwbse = GWBSE::get();
   PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
@@ -62,11 +58,7 @@ void PMatrix::compute() {
 
   int ndata = nfft[0]*nfft[1]*nfft[2];
   ndata = config.tile_rows;//ndata/config.tile_rows;
-<<<<<<< HEAD
   P_m = new complex[ndata*ndata];
-=======
-  complex *P_m = new complex[ndata*ndata];
->>>>>>> 9ab764b950b6e34c8aa5502e89fd2509923171e4
 
 for(int ik=0;ik<gwbse->gw_parallel.K;ik++) {
 
@@ -402,7 +394,6 @@ for(int i=0;i<ndata*ndata;i++)
 }
 
 
-<<<<<<< HEAD
 void PMatrix::sigma_init(std::vector<int> _accept) {
   accept = _accept;
   // contribute(CkCallback(CkReductionTarget(Controller, sigma_n3_initialized), controller_proxy));
@@ -413,18 +404,6 @@ void PMatrix::cubic_sigma_per_window(const int is,
                                     const int iq,
                                     const int ikq,
                                     const WINPAIR& winpair,
-=======
-void PMatrix::cubic_sigma_per_window(CMATRIX* sigmat,
-                                    const int is,
-                                    const int ik,
-                                    const int iq,
-                                    const int ikq,
-                                    const WAVEFUNCTION& WFN,
-                                    const kGPP& Gpp,
-                                    const WINPAIR& winpair,
-                                    const GSPACE* g,
-                                    const bool* acceptEps,
->>>>>>> 9ab764b950b6e34c8aa5502e89fd2509923171e4
                                     const std::vector<double>& state_e,
                                     const std::vector<int>& state_idx,
                                     const std::vector<double>& pp_e,
@@ -463,7 +442,6 @@ void PMatrix::cubic_sigma_per_window(CMATRIX* sigmat,
     // HGL needs to calcualte B_p and f_n twice (Eq. 35)
     for (int iLoop=0; iLoop < nloops; iLoop++) {
       // B^p_{rr'}  Eq. 35
-<<<<<<< HEAD
       F_m = new complex[tile_size]; // psi rr' tile
       B_m = new complex[tile_size]; // gpp rr' tile
       PerformPPEnergySumThisNode(is, iq, pp_e, pp_idx, winpair, inode, bIsHGL, bIsFirstLoop);
@@ -473,30 +451,12 @@ void PMatrix::cubic_sigma_per_window(CMATRIX* sigmat,
       }
       delete [] B_m;
       delete [] F_m;
-=======
-      CMATRIX *B = new CMATRIX(ndata, ndata);
-      CMATRIX *F = new CMATRIX(ndata, ndata);
-      PerformPPEnergySumThisNode(B, is, iq, Gpp, acceptEps, pp_e, pp_idx, winpair, inode, bIsHGL, bIsFirstLoop);
-      PerformStateSumThisNode(F, is, ik, ikq, WFN, state_e, state_idx, winpair, inode, bIsHGL, bIsFirstLoop, uklpp);
-      for (int idata = 0; idata < ndata*ndata; idata++) {
-          sigmat->m[idata] += iQuadFactor * F->m[idata] * B->m[idata];
-      }
-      delete B, F;
->>>>>>> 9ab764b950b6e34c8aa5502e89fd2509923171e4
     }
   }  // end quadrature loop
 }
 
-<<<<<<< HEAD
 void PMatrix::PerformPPEnergySumThisNode(const int is,
                                         const int iq,
-=======
-void PMatrix::PerformPPEnergySumThisNode(CMATRIX* B_rr,
-                                        const int is,
-                                        const int iq,
-                                        const kGPP& Gpp,
-                                        const bool* acceptEps,
->>>>>>> 9ab764b950b6e34c8aa5502e89fd2509923171e4
                                         const std::vector<double>& pp_wp,
                                         const std::vector<int>& pp_idx,
                                         const WINPAIR& winpair,
@@ -504,29 +464,17 @@ void PMatrix::PerformPPEnergySumThisNode(CMATRIX* B_rr,
                                         const bool IsHGL,
                                         const bool IsFirstHGL) {
   assert(pp_wp.size() == pp_idx.size());
-<<<<<<< HEAD
   PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
 
 
   double* const gpp_eig  = psi_cache->get_gpp_eig();
   double* const gpp_omsq = psi_cache->get_gpp_omsq();
-=======
-
-  CMATRIX* const A_gAlpha  = Gpp.S[is][iq];
-  double* const gpp_eig    = Gpp.eigval[is][iq];
-  double* const  gpp_omsq  = Gpp.omsq[is][iq];
->>>>>>> 9ab764b950b6e34c8aa5502e89fd2509923171e4
 
   const double tau_u     = winpair.nodes[inode];
   const double zeta      = winpair.zeta;  // 1.0 / sqrt(winpair.gap * winpair.bw);
   const double gamma     = winpair.gamma;
   const double wp_min    = winpair.w2[0];
   const int Nb           = pp_idx.size();
-<<<<<<< HEAD
-=======
-  const int ng           = Gpp.ng[iq];
-  GSPACE* const g        = Gpp.vc[iq].gs;
->>>>>>> 9ab764b950b6e34c8aa5502e89fd2509923171e4
 
   for (int j = 0; j < Nb; j++) {
     double omsq_j = gpp_omsq[pp_idx[j]];
@@ -549,65 +497,25 @@ void PMatrix::PerformPPEnergySumThisNode(CMATRIX* B_rr,
         }  // end if
       }  // end if
 
-<<<<<<< HEAD
       complex* const B_r = psi_cache->get_gpp_br(pp_idx[j]);
 
 #ifdef USE_LAPACK
-=======
-      std::complex<double> B_r[ndata] = {0.0};
-      
-      int gidx = 0;
-      for (int inr=0; inr < ndata; inr++) {
-        B_r[inr] = (0, 0);
-        if (acceptEps[inr]) {
-          B_r[gidx] = A_gAlpha->get(gidx, pp_idx[j]);
-          gidx++;
-        }
-      }
-      // for (int gidx=0; gidx < ng; gidx++) {
-      //   B_r[gidx] = A_gAlpha->get(gidx, pp_idx[j]);
-      // }
-      
-
-      forward_fft(nfft, ng, g, B_r, 1.);
-      // setup_fftw_3d(nfft,1);
-      // put_into_fftbox(nfft,B_r,in_pointer);
-      // do_fftw();
-      // fftbox_to_array(ndata,out_pointer,B_r,1);
-
->>>>>>> 9ab764b950b6e34c8aa5502e89fd2509923171e4
       char transformT = 'C';
       char transform  = 'N';
       int Lone        = 1;
       double one    = 1.0;
       
-<<<<<<< HEAD
       myGEMM(&transform, &transformT, &tile_size, &tile_size, &Lone,  &factor, B_r, &ndata, B_r, &tile_size, &one, B_m, &tile_size);
 #else
     Die("Without -DUSE_LAPACK flag, polarizability calculation does not work!");
 #endif
-=======
-      // GEMM   C:= alpha*A*B + beta*C
-      // GEMM   B_rr->m := alpha*B_r*B_r^H + beta*B_rr->m (alpha = factor, beta = 1.0)
-      myGEMM(&transform, &transformT, &ndata, &ndata, &Lone,  &factor, B_r, &ndata, B_r, &ndata, &one, B_rr->m, &ndata);
-      // B_rr->element_sum();
-      // printf("PPSUM factor %f sigma %f omega %f tau_u %f wp_min %f zeta %f pp_wp_j %f Brr_sum %f\n", factor, sigma_j, omega_j, tau_u, wp_min, zeta, pp_wp[j], B_rr->esum.real());
->>>>>>> 9ab764b950b6e34c8aa5502e89fd2509923171e4
     }
   }
 }
 
-<<<<<<< HEAD
 void PMatrix::PerformStateSumThisNode(const int& is,
                                     const int& ik,
                                     const int& ikq,
-=======
-void PMatrix::PerformStateSumThisNode(CMATRIX* fmat,
-                                    const int& is,
-                                    const int& ik,
-                                    const int& ikq,
-                                    const WAVEFUNCTION& WFN,
->>>>>>> 9ab764b950b6e34c8aa5502e89fd2509923171e4
                                     const std::vector<double>& state_e,
                                     const std::vector<int>& state_idx,
                                     const WINPAIR& winpair,
@@ -629,20 +537,11 @@ void PMatrix::PerformStateSumThisNode(CMATRIX* fmat,
   
   for (int i = 0; i < Na; i++) {
     complex* psiRkq_i = new complex[psi_ndata_local];
-<<<<<<< HEAD
     complex *fr1; //rho-bar matrix
     for (int i=0; i<tile_size; i++){
       psiRkq_i[i] = psi_cache->psis[ikq][i][region_ridx*psi_ndata_local+i];
     }
     fr1 = new complex[tile_size];
-=======
-    for (int i=0; i<ndata; i++){
-      psiRkq_i[i] = psi_cache->psis[ikq][i][region_ridx*psi_ndata_local+i];
-    }
-
-    std::complex<double>* psiRkq_i  = WFN.psiR[is][ikq]->coeff[state_idx[i]];
-    std::complex<double>* fr1 = new std::complex<double>[ndata];
->>>>>>> 9ab764b950b6e34c8aa5502e89fd2509923171e4
 
     compute_fr(fr1, psiRkq_i, uklpp);
 
@@ -669,16 +568,12 @@ void PMatrix::PerformStateSumThisNode(CMATRIX* fmat,
     //   printf("%f\n", fr1[i]);
     // }
     // fmat->printDiag("debug/fmat_diag0.dat");
-<<<<<<< HEAD
 #ifdef USE_LAPACK
     myGEMM(&transform, &transformT, &tile_size, &tile_size, &Lone,  &factor, fr1, &tile_size, fr1, &tile_size, &beta, F_m, &tile_size);
 #else
     Die("Without -DUSE_LAPACK flag, polarizability calculation does not work!");
 #endif    
     
-=======
-    myGEMM(&transform, &transformT, &ndata, &ndata, &Lone,  &factor, fr1, &ndata, fr1, &ndata, &beta, fmat->m, &ndata);
->>>>>>> 9ab764b950b6e34c8aa5502e89fd2509923171e4
     // fmat->printDiag("debug/fmat_diag.dat");
     
     delete [] fr1;
@@ -687,25 +582,14 @@ void PMatrix::PerformStateSumThisNode(CMATRIX* fmat,
 }
 
 
-<<<<<<< HEAD
 void PMatrix::compute_fr(complex* fr, const std::complex<double>* psikq, const int uklpp[3]){
   // set f_r
   for(int i=0; i<tile_size; i++){
-=======
-void PMatrix::compute_fr(std::complex<double>* fr, const std::complex<double>* psikq, const int uklpp[3]){
-
-  // set f_r
-  for(int i=0; i<ndata; i++){
->>>>>>> 9ab764b950b6e34c8aa5502e89fd2509923171e4
       fr[i] = psikq[i];
   }
   // Need to modify psikq if umklapp vector is not zero
   if( uklpp[0]!=0 || uklpp[1]!=0 || uklpp[2]!=0 ){
-<<<<<<< HEAD
     complex* psikq_tmp[tile_size];
-=======
-    std::complex<double> psikq_tmp[ndata];
->>>>>>> 9ab764b950b6e34c8aa5502e89fd2509923171e4
     modify_state_Uproc(fr, uklpp, nfft, sys);
   }
 }
@@ -716,12 +600,7 @@ void PMatrix::sigma_cubic_main(std::complex<double>* sigma,
                               const double& w,
                               const std::vector<std::pair<int, int>>& n12,
                               const bool& bIsOccupied,
-<<<<<<< HEAD
                               WINDOWING& WIN) {
-=======
-                              WINDOWING& WIN
-                        ) {
->>>>>>> 9ab764b950b6e34c8aa5502e89fd2509923171e4
   int nq = nkpt;  // (kayahans FIXME)
   PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
   double*** e_occ = gwbse->gw_epsilon.Eocc;
@@ -739,10 +618,6 @@ void PMatrix::sigma_cubic_main(std::complex<double>* sigma,
     std::copy(_eig_occ, _eig_occ+nocc, back_inserter(psi_eig));
     std::copy(_eig_unocc, _eig_unocc+nunocc, back_inserter(psi_eig));
 
-<<<<<<< HEAD
-=======
-    CMATRIX* S = Gpp.S[is][iq];
->>>>>>> 9ab764b950b6e34c8aa5502e89fd2509923171e4
     int state_start_index = 0;
     int state_end_index = sys.nocc;
     if (!bIsOccupied) {
@@ -808,11 +683,7 @@ void PMatrix::sigma_cubic_main(std::complex<double>* sigma,
       // we use zeta = - winpair.zeta;
 
       if (state_e.size() > 0 && pp_wp.size() > 0) {
-<<<<<<< HEAD
         cubic_sigma_per_window(is, ik, iq, ikq, winpair, state_e, state_idx, pp_wp, pp_idx, uklpp);
-=======
-        cubic_sigma_per_window(sigmat, is, ik, iq, ikq, WFN, Gpp, winpair, g, acceptEps, state_e, state_idx, pp_wp, pp_idx, uklpp);
->>>>>>> 9ab764b950b6e34c8aa5502e89fd2509923171e4
       }
     }  // end winpair loop
     delete g;
@@ -842,12 +713,7 @@ void PMatrix::sigma_cubic_main(std::complex<double>* sigma,
 void PMatrix::cubicSigma(std::complex<double> w,
                         const int& is,
                         const int& ik,
-<<<<<<< HEAD
                         const SIGMAINDICES& iwn12
-=======
-                        const SIGMAINDICES& iwn12,
-                        WINDOWING& WIN
->>>>>>> 9ab764b950b6e34c8aa5502e89fd2509923171e4
                         ) {
   double totsum = 0;
   const bool positive(true);
@@ -882,11 +748,7 @@ void PMatrix::sigma() {
 
   // Set up regioning data
   psi_ndata_local = config.tile_rows;
-<<<<<<< HEAD
   tile_size = config.tile_rows * config.tile_cols;
-=======
-  psi2_ndata_local = config.tile_rows * config.tile_rows;
->>>>>>> 9ab764b950b6e34c8aa5502e89fd2509923171e4
   region_ridx = 0;
   for(int r_i=0;r_i<psi_cache->regions.size();r_i++)
     if(start_row == psi_cache->regions[r_i].second) {
@@ -901,11 +763,8 @@ void PMatrix::sigma() {
       break;
     }
   
-<<<<<<< HEAD
   sigma_m = new complex[tile_size]; // sigma rr' tile
   
-=======
->>>>>>> 9ab764b950b6e34c8aa5502e89fd2509923171e4
   // Calculate sigma
   for(int ik = 0; ik<nkpt; ik++) {
     for(int is = 0; is<nspin; is++) {
