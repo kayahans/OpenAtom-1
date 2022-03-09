@@ -8,6 +8,8 @@
 #include "psi_cache.decl.h"
 #include "fvector_cache.decl.h"
 #include "class_gw_io.h"
+#include "laplace.h"
+#include "../utils/windowing.h"
 
 #include <unordered_set>
 #include <unordered_map>
@@ -179,7 +181,14 @@ class PsiCache : public CBase_PsiCache {
     void setRegionData(PMatrix* matrix_chare, int start_row, int start_col,
                        int tile_nrows, int tile_ncols);
     void reportInfo();
+    LAPLACE* getLP();
+    WINDOWING* getWin();
 
+    int elements;
+    int total_elements;
+    complex*** psis;
+    std::vector<std::pair<int, int>> regions;
+    double get_OccOcc(int k, int iv);
   private:
     void kqIndex(unsigned, unsigned&, int*);
     void computeUmklappFactor(int*);
@@ -187,9 +196,9 @@ class PsiCache : public CBase_PsiCache {
     // Used for CkLoop parameters
     FComputePacket f_packet;
 
-    unsigned K, L, psi_size, received_psis, qindex, pipeline_stages, received_chunks;
+    unsigned K, L, M, psi_size, received_psis, qindex, pipeline_stages, received_chunks;
     // TODO: Flatten arrays?
-    complex*** psis;
+    // complex*** psis;
     complex*** psis_shifted;
     complex* rhoData;
     complex* rhoDataG;
@@ -197,6 +206,7 @@ class PsiCache : public CBase_PsiCache {
     complex *fsave;
     complex *f_nop;
     complex *states;
+    complex* P_m;
     std::vector<double> vcoulb;
     std::vector<double> ga;
     std::vector<double> gb;
@@ -204,6 +214,7 @@ class PsiCache : public CBase_PsiCache {
     int ng;
     complex* umklapp_factor;
     int n_np;
+    int states_received;
     int ndata_rho;
     int *nr;
     int *n_list, *np_list;
@@ -213,9 +224,14 @@ class PsiCache : public CBase_PsiCache {
 
     // Used for registering fvector regions
     std::vector<PMatrix*> matrix_chares;
-    std::vector<std::pair<int, int>> regions;
+    // std::vector<std::pair<int, int>> regions;
     int min_row, min_col, max_row, max_col;
     CmiNodeLock tile_lock;
+    LAPLACE *lp;
+    WINDOWING *WIN;
+    
+    double*** Occ_occ;
+    double*** Occ_unocc;
 };
 
 class FVectorCache : public CBase_FVectorCache {

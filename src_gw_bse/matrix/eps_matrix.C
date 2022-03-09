@@ -686,8 +686,10 @@ void EpsMatrix::print(int qindex, int fnum) {
     for (int c = 0; c < config.tile_cols; c++) {
         global_row = x*config.tile_rows + r;
         global_col = y*config.tile_cols + c;
-        double re = data[c*config.tile_rows + r].re;
-        double im = data[c*config.tile_rows + r].im;
+        // double re = data[c*config.tile_rows + r].re;
+        // double im = data[c*config.tile_rows + r].im;
+        double re = data[IDX_eps(r,c)].re;
+        double im = data[IDX_eps(r,c)].im;
         fprintf(fp, "%d %d %d %d %.8e %.8e\n", x, y, global_row, global_col, re, im);
         // CkPrintf("[EPSMATRIX] x/y %d %d global_r/c %d %d val %.8e\n", x, y, global_row, global_col, val);
       i++;
@@ -732,9 +734,10 @@ DiagMessage* EpsMatrix::sendDataSimple(DiagMessage* msg) {
 
   for (int r = 0; r < config.tile_rows ; r++) {
     for (int c = 0; c < config.tile_cols; c++) {
-      global_index = c*config.tile_rows + r;
+      // global_index = c*config.tile_rows + r;
         if (r < msg_rows && c < msg_cols) {
-          data[global_index] = msg->data[i];
+          // data[global_index] = msg->data[i];
+          data[IDX_eps(r,c)] = msg->data[i];
           // data[r*config.tile_cols + c] = msg->data[c*msg_rows + r];
           i++;
         }

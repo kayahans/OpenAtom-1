@@ -148,7 +148,7 @@ group DiagBridge{
         int pe_row = mype / proc_cols;
         int pe_col = mype % proc_cols;
         // TODO(kayahans) hardcoded
-        std::vector<double> eig(diagData->eig_e, diagData->eig_e + 137);
+        std::vector<double> eig(diagData->eig_e, diagData->eig_e + real_epsilon_size);
         gpp2D_proxy.recv_eig(eig);
         
 
@@ -201,13 +201,15 @@ group DiagBridge{
             // // if (idx_row == 0 && idx_col == 0) {
 
             
-            for (int j = 0; j < num_loc_cols; j++) { 
-              for (int i = 0; i < num_loc_rows; i++) { 
+            for (int i = 0; i < num_loc_rows; i++) { 
+              for (int j = 0; j < num_loc_cols; j++) { 
                 bl_cyclic_index = start_index + (j * dd_row_size) + i;
+                msg->data[IDX_eps(i,j)].re = diagData->eig_v[bl_cyclic_index].real();
+                msg->data[IDX_eps(i,j)].im = diagData->eig_v[bl_cyclic_index].imag();
                 // msg->data[j*num_loc_rows + i].re = diagData->eig_v[bl_cyclic_index].real();
                 // msg->data[j*num_loc_rows + i].im = diagData->eig_v[bl_cyclic_index].imag();
-                msg->data[i*num_loc_cols + j].re = diagData->eig_v[bl_cyclic_index].real();
-                msg->data[i*num_loc_cols + j].im = diagData->eig_v[bl_cyclic_index].imag();
+                // msg->data[i*num_loc_cols + j].re = diagData->eig_v[bl_cyclic_index].real();
+                // msg->data[i*num_loc_cols + j].im = diagData->eig_v[bl_cyclic_index].imag();
                 int global_row = glob_start_row + i;
                 int global_col = glob_start_col + j;
               //   if (eps_row_idx == 0 && eps_col_idx == ) {

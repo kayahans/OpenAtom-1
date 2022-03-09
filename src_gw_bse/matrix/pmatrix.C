@@ -36,6 +36,764 @@ PMatrix::PMatrix(MatrixConfig config) : CBase_PMatrix(config) {
   total_time = 0.0;
 }
 
+void PMatrix::compute() {
+//if(!(thisIndex.x==0 && thisIndex.y==0)) return;
+  GWBSE *gwbse = GWBSE::get();
+  PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
+  LAPLACE *lp = psi_cache->getLP();
+  int counter = 0;
+  int nocc = gwbse->gw_parallel.L;
+  int nwocc = lp->nwocc;
+  int p_metal = 0;
+
+  double*** e_occ = gwbse->gw_epsilon.Eocc;
+  double*** e_unocc = gwbse->gw_epsilon.Eunocc;
+  double*** occ_occ = gwbse->gw_epsilon.Occ_occ;
+  double*** occ_unocc = gwbse->gw_epsilon.Occ_unocc;
+  int M = gwbse->gw_parallel.M;
+
+  int* nfft;
+  nfft = gwbse->gw_parallel.fft_nelems;
+
+  int ndata = nfft[0]*nfft[1]*nfft[2];
+  ndata = config.tile_rows;//ndata/config.tile_rows;
+  complex *P_m = new complex[ndata*ndata];
+
+for(int ik=0;ik<gwbse->gw_parallel.K;ik++) {
+
+  int indexes[3]; // This is for metal calculation
+  indexes[0] = 0;//is;
+  unsigned ikq;
+  int umklapp[3];
+  kqIndex(ik, ikq, umklapp);
+  indexes[1] = ik;
+  indexes[2] = ikq;
+
+  // loop over window : occupied states
+  for (int iwocc=0; iwocc<nwocc; iwocc++){
+
+    // Occupied state energy in this window
+    // Find number of occupied states in this window  
+    int this_nocc=0;
+#if 0
+    if (p_metal){
+      int kindex = sys.nkpt * indexes[0] + indexes[2];
+      nocc = L.nvk[kindex];
+      printf("\nL.nvk[%d] = %d\n", kindex, L.nvk[kindex]);
+    }
+#endif
+
+    for (int iv=0; iv<nocc; iv++){
+      if (lp->bin_occ[iwocc] <= e_occ[0][ikq][iv]  &&  e_occ[0][ikq][iv] < lp->bin_occ[iwocc+1])
+        this_nocc += 1;
+    } // done calculating occupied states in this window
+    // now we save eigenvalues in this window to Eocc
+
+    double Eocc[this_nocc];
+    double Occp_occ[this_nocc]; // occupation
+    int Eoccidx[this_nocc];
+    counter = 0;
+    for (int iv=0; iv<nocc; iv++){
+      if (lp->bin_occ[iwocc] <= e_occ[0][ikq][iv]  &&  e_occ[0][ikq][iv] < lp->bin_occ[iwocc+1])
+        {
+ //         if(counter >= this_nocc) CkPrintf("\nNode-%d Error", CkMyNode());
+#if 1
+          Eocc[counter] = e_occ[0][ikq][iv];
+          Occp_occ[counter] = psi_cache->get_OccOcc(ikq, iv);//gwbse->gw_epsilon.Occ_occ[0][ikq][iv];//occ_occ[0][ikq][iv];
+#endif
+#if 1
+        // Reset occupation for metal to prevent some crazy occupation numbers (like 1E-123)
+        if(p_metal){
+          if ( abs ( Occp_occ[counter]-1e-0 ) < 1e-6){
+            Occp_occ[counter] = 1.0;
+          }
+          else if( abs ( Occp_occ[counter] ) < 1e-6 ){
+            Occp_occ[counter] = 0.0;
+          }
+        }
+#endif
+        Eoccidx[counter] = iv;
+        counter += 1;
+      }
+    }
+
+    // loop over window : unoccupied states
+    int nwunocc = lp->nwunocc;
+    for (int iwunocc=0; iwunocc<nwunocc; iwunocc++){
+      int nunocc = gwbse->gw_parallel.M;
+      int nocc = gwbse->gw_parallel.L;
+
+      // Unoccupied state energy in this window
+      // Find number of unoccupied states in this window
+      int this_nunocc=0;
+      // if metal, reset nunocc (and also need to re-reset nocc for this k
+      if (p_metal){
+        int kindex = gwbse->gw_parallel.K * indexes[0] + indexes[1];
+        nunocc = lp->nck[kindex];
+        nocc = lp->nvk[kindex];
+      }
+
+      for (int ic=0; ic<nunocc; ic++){
+        if(lp->bin_unocc[iwunocc] <= e_unocc[0][ik][ic]  &&  e_unocc[0][ik][ic] < lp->bin_unocc[iwunocc+1])
+          this_nunocc += 1;
+      } // done calculating unoccupied states in this window
+      // now we save eigenvalues in this window to Eunocc
+      double Eunocc[this_nunocc];
+      double Occp_unocc[this_nunocc];
+      int Eunoccidx[this_nunocc];
+      counter = 0;
+      for (int ic=0; ic<nunocc; ic++){
+        if(lp->bin_unocc[iwunocc] <= e_unocc[0][ik][ic] &&  e_unocc[0][ik][ic] < lp->bin_unocc[iwunocc+1]){
+          Eunocc[counter] = e_unocc[0][ik][ic];
+          // Reset occupation for metal to prevent some crazy occupation numbers (like 1E-123)
+          Occp_unocc[counter] = occ_occ[0][ik][nocc+ic];
+          if(p_metal){
+            if ( abs ( Occp_unocc[counter]-1.0 ) < 1e-6){
+              Occp_unocc[counter] = 1.0;
+            }
+            else if( abs ( Occp_unocc[counter] ) < 1e-6 ){
+              Occp_unocc[counter] = 0.0;
+            }
+          }
+          Eunoccidx[counter] = nocc+ic;
+          counter += 1;
+        }
+      }
+
+      // debugging message
+#ifdef DEBUG
+      printf("\n unoccupied states window %d , number of unoccupied states in this window: %d\n",iwunocc, this_nunocc);
+      for (int i=0;i<this_nunocc;i++){
+  printf("This unoccupied state: %d  Eunocc: %lg (%lg) , Eunoccidx: %d\n",i,Eunocc[i],Occp_unocc[i],Eunoccidx[i]);
+      }
+#endif
+
+      // number of nodes and optimized a at this window pair (iwocc,iwunocc)
+      int Ng = lp->Nnodes[iwocc][iwunocc];
+      double opta = lp->opta[iwocc][iwunocc];
+
+      //----------------------------------
+      // Gaussian quadrature starts here
+      //----------------------------------
+      // loop over the GL nodes
+      double gap = lp->gap;
+      for (int n=0; n<Ng; n++){
+        double Wn = lp->w[Ng-1][n];
+        double Xn = lp->n[Ng-1][n];
+#if DEBUG4
+        printf("\nL.w[%d][%d] = %lf, L.n[Ng-1][n] = %lf gap = %lf\n", Ng-1, n, Lw, Ln, gap);
+#endif
+      double factor =  (-4.0/opta/1) * Wn * exp( -( gap/opta -1.0 ) * Xn );
+
+        // adding p_metal calculation here
+        // set internal counter for p_metal calculations 
+        // if p_metal is true, nloop = 2
+        // if not p_metal, nloop = 1
+        int nloop = 1;
+        // now let's check if we have to include f(Ec) or f(Ev) below. 
+        // if occupancies are not 1 or 0, then we perform metal calculations for this window pair
+        if( p_metal ){
+          double one = 1.0;
+          double zero = 0.0;
+          for (int i=0; i<this_nocc; i++){
+            if (Occp_occ[i] != zero && Occp_occ[i] != one){
+              nloop = 2;
+              // report only once
+            if( n==0 ){
+                printf("Occp_occ[%d]=%f\n",i,Occp_occ[i]);
+              }
+              break;
+            }
+          }
+          for (int i=0; i<this_nunocc; i++){
+            if( Occp_unocc[i] != zero && Occp_unocc[i] != one){
+              nloop = 2;
+              // report only once
+              if ( n==0 ){
+                printf("Occp_unocc[%d]=%f\n",i,Occp_unocc[i]);
+              }
+              break;
+            }
+          }
+        }
+
+        // if not p_metal, then nloop is 1 (and assume the system is gapped)
+        for ( int ploop=0; ploop<nloop; ploop++ ){
+          complex *focc; //rho matrix
+          complex *funocc; //rho-bar matrix
+          focc = new complex[ndata*ndata];
+          funocc = new complex[ndata*ndata];
+
+          // Occupied states
+          complex *_psis_occ1 = new complex[this_nocc*ndata];
+          complex *_psis_occ2 = new complex[this_nocc*ndata];
+          complex *_psis_unocc1 = new complex[this_nunocc*ndata];
+          complex *_psis_unocc2 = new complex[this_nunocc*ndata];
+
+          int region_ridx = 0;
+          for(int r_i=0;r_i<psi_cache->regions.size();r_i++)
+            if(start_row == psi_cache->regions[r_i].second) {
+              region_ridx = r_i;
+              break;
+            }
+
+          int region_cidx = 0;
+          for(int r_i=0;r_i<psi_cache->regions.size();r_i++)
+            if(start_col == psi_cache->regions[r_i].second) {
+              region_cidx = r_i;
+              break;
+            }
+
+          for (int iv=0; iv<this_nocc; iv++){
+
+            // copy of the occupied state wavefunction as it may change due to U process
+            complex *psi_occ1 = new complex[ndata];
+            complex *psi_occ2 = new complex[ndata];
+
+            
+
+            for (int i=0; i<ndata; i++){
+              psi_occ1[i] = psi_cache->psis[ikq][Eoccidx[iv]][region_ridx*ndata+i];
+              psi_occ2[i] = psi_cache->psis[ikq][Eoccidx[iv]][region_cidx*ndata+i];
+            }
+
+#if 0
+            // modify wavefunction if umklapp scattering applies
+            int uklsq = uklpp[0]*uklpp[0] + uklpp[1]*uklpp[1] + uklpp[2]*uklpp[2];
+            if ( uklsq != 0 ){
+              modify_state_Uproc(psi_occ, uklpp, nfft, sys);
+            }
+#endif
+
+            for (int i=0; i<ndata; i++){
+              // for gapped system
+              if (nloop==1){
+                _psis_occ1[iv*ndata+i] = psi_occ1[i] * sqrt( exp(-(lp->maxEocc-Eocc[iv])/opta*Xn) );
+                _psis_occ2[iv*ndata+i] = psi_occ2[i] * sqrt( exp(-(lp->maxEocc-Eocc[iv])/opta*Xn) );
+              }
+              // for metal
+              if (nloop==2){
+                if(ploop==0){
+                  _psis_occ1[iv*ndata+i] = psi_occ1[i] * sqrt( exp(-(lp->maxEocc-Eocc[iv])/opta*Xn) ) * sqrt( Occp_occ[iv] );
+                  _psis_occ2[iv*ndata+i] = psi_occ2[i] * sqrt( exp(-(lp->maxEocc-Eocc[iv])/opta*Xn) ) * sqrt( Occp_occ[iv] );
+                }
+                else if(ploop==1){
+                  _psis_occ1[iv*ndata+i] = psi_occ1[i] * sqrt( exp(-(lp->maxEocc-Eocc[iv])/opta*Xn) );
+                  _psis_occ2[iv*ndata+i] = psi_occ2[i] * sqrt( exp(-(lp->maxEocc-Eocc[iv])/opta*Xn) );
+                }
+              }
+            }
+            delete[] psi_occ1;
+            delete[] psi_occ2;
+          } // end occupied states
+#ifdef USE_LAPACK
+    char transformT = 'C'; // conjugate transpose (Hermitian conjugate)
+    char transform = 'N'; // do nothing
+    double Lalpha = double(1.0); // scale A*B by this factor
+    double Lbeta = double(1.0); // scale initial value of C by this factor
+    // LAPACK GEMM: C = alpha*A*B + beta*C
+    myGEMM( &transform, &transformT, &ndata, &ndata, &this_nocc, &Lalpha, _psis_occ2, &ndata, _psis_occ1, &ndata, &Lbeta, focc, &ndata);
+#else
+    Die("Without -DUSE_LAPACK flag, polarizability calculation does not work!");
+#endif
+
+    // Unoccupied states
+
+    for (int ic=0; ic<this_nunocc; ic++){
+      // copy unoccupied states into the temporary array
+      complex psi_unocc1[ndata];
+      complex psi_unocc2[ndata];
+      int region_ridx = 0;
+      for(int r_i=0;r_i<psi_cache->regions.size();r_i++)
+        if(start_row == psi_cache->regions[r_i].second) {
+          region_ridx = r_i;
+          break;
+        }
+
+      int region_cidx = 0;
+      for(int r_i=0;r_i<psi_cache->regions.size();r_i++)
+        if(start_col == psi_cache->regions[r_i].second) {
+          region_cidx = r_i;
+          break;
+        }
+      for (int i=0; i<ndata; i++){
+        psi_unocc1[i] = psi_cache->psis[ik][Eunoccidx[ic]][region_ridx*ndata+i].conj();
+        psi_unocc2[i] = psi_cache->psis[ik][Eunoccidx[ic]][region_cidx*ndata+i].conj();
+      }
+
+      for (int i=0; i<ndata; i++){
+        // for gapped system
+        if (nloop==1){
+          _psis_unocc1[ic*ndata+i] = psi_unocc1[i] * sqrt( exp(-(Eunocc[ic]-lp->minEunocc)/opta * Xn) );
+          _psis_unocc2[ic*ndata+i] = psi_unocc2[i] * sqrt( exp(-(Eunocc[ic]-lp->minEunocc)/opta * Xn) );
+        }
+        // for metal
+        if (nloop==2){
+          if(ploop==0){
+            _psis_unocc1[ic*ndata+i] = psi_unocc1[i] * sqrt( exp(-(Eunocc[ic]-lp->minEunocc)/opta*Xn) );
+            _psis_unocc2[ic*ndata+i] = psi_unocc2[i] * sqrt( exp(-(Eunocc[ic]-lp->minEunocc)/opta*Xn) );
+          }
+          else if(ploop==1){
+            _psis_unocc1[ic*ndata+i] = psi_unocc1[i] * sqrt( exp(-(Eunocc[ic]-lp->minEunocc)/opta*Xn) );
+            _psis_unocc2[ic*ndata+i] = psi_unocc2[i] * sqrt( exp(-(Eunocc[ic]-lp->minEunocc)/opta*Xn) );
+          }
+        }
+      }
+    }// end unoccupied state
+#ifdef USE_LAPACK
+    myGEMM( &transform, &transformT, &ndata, &ndata, &this_nunocc, &Lalpha, _psis_unocc2, &ndata, _psis_unocc1, &ndata, &Lbeta, funocc, &ndata);
+#else
+    Die("Without -DUSE_LAPACK flag, polarizability calculation does not work!");
+#endif
+
+    // Update P
+    for (int i=0; i<ndata*ndata; i++){
+      // for the first ploop, the sign is "+"  (either gapped system or metal first loop)
+      if(ploop==0){
+        P_m[i] += ((factor * focc[i] * funocc[i])*100000)/100000;
+      }
+      // for the second ploop, the sign is "-"
+      if(ploop==1){
+        P_m[i] -= ((factor * focc[i] * funocc[i])*100000)/100000;
+      }
+    }
+#if DEBUG4
+//    printf("\nfocc[10] = %lf, %lf, funocc[0] = %lf, %lf\n", focc[10].re, focc[10].im, funocc[0].re, funocc[0].im);
+    printf("\n[%d,%d, %d]P->m[0] = %lf, %lf factor = %lf\n", iwocc, iwunocc, n, P_m[0].re, P_m[0].im, factor);
+#endif
+    delete[] focc;
+    delete[] funocc;
+    delete[] _psis_occ1;
+    delete[] _psis_occ2;
+    delete[] _psis_unocc1;
+    delete[] _psis_unocc2;
+        }
+
+      }
+
+    }
+  }
+
+}
+  if(thisIndex.x==0 && thisIndex.y==0)
+  {
+    printf("\n[Node-%d][%d,%d]P->m[0] = %lf %lf\n", CkMyNode(), thisIndex.x, thisIndex.y,P_m[0].re, P_m[0].im);
+    fflush(stdout);
+  }
+
+  psi_cache->elements++;
+  int node_elems = psi_cache->total_elements/CkNumNodes();
+  int tens = node_elems/10;
+  if(psi_cache->elements%tens == 0)
+    CkPrintf("\n%d%% p-matrix done", 10*psi_cache->elements/tens);
+for(int i=0;i<ndata*ndata;i++)
+  data[i] = P_m[i].conj();
+//CkPrintf("\nContrib %d,%d\n", thisIndex.x, thisIndex.y);
+  contribute(CkCallback(CkReductionTarget(Controller, newPMatrixComplete), controller_proxy));
+}
+
+
+void PMatrix::cubic_sigma_per_window(CMATRIX* sigmat,
+                                    const int is,
+                                    const int ik,
+                                    const int iq,
+                                    const int ikq,
+                                    const WAVEFUNCTION& WFN,
+                                    const kGPP& Gpp,
+                                    const WINPAIR& winpair,
+                                    const GSPACE* g,
+                                    const bool* acceptEps,
+                                    const std::vector<double>& state_e,
+                                    const std::vector<int>& state_idx,
+                                    const std::vector<double>& pp_e,
+                                    const std::vector<int>& pp_idx,
+                                    const int uklpp[3]) {
+  //
+  // Calculates Sigma(w) in a given window pair Eq. 12
+  //
+  assert(state_e.size() == state_idx.size());
+  assert(pp_e.size() == pp_idx.size());
+  bool bIsHGL = winpair.isHgl;
+  //
+  // start loop over quadrature nodes/weights
+  //
+  double iQuadFactor;
+  // for (int idata = 0; idata < ndata*ndata; idata++) {
+  //   sigmat->m[idata] = 0.0;
+  // }
+  for (int inode = 0; inode < winpair.nodes.size(); inode++) {
+    int nloops;
+    bool bIsFirstLoop;
+    double tau_u = winpair.nodes[inode];
+    double w_u   = winpair.weights[inode];
+    double zeta  = winpair.zeta;
+    double gap   = winpair.gap;
+    
+    if (winpair.isHgl) {
+      iQuadFactor = w_u * winpair.gamma;  // MJ used -gamma here, check why and how it differs from zeta
+      nloops = 2;
+      bIsFirstLoop = true;
+    } else {
+      iQuadFactor = w_u * zeta * exp(-tau_u*(gap*zeta - 1.0));
+      nloops = 1;
+      bIsFirstLoop = false;
+    }
+    // HGL needs to calcualte B_p and f_n twice (Eq. 35)
+    for (int iLoop=0; iLoop < nloops; iLoop++) {
+      // B^p_{rr'}  Eq. 35
+      CMATRIX *B = new CMATRIX(ndata, ndata);
+      CMATRIX *F = new CMATRIX(ndata, ndata);
+      PerformPPEnergySumThisNode(B, is, iq, Gpp, acceptEps, pp_e, pp_idx, winpair, inode, bIsHGL, bIsFirstLoop);
+      PerformStateSumThisNode(F, is, ik, ikq, WFN, state_e, state_idx, winpair, inode, bIsHGL, bIsFirstLoop, uklpp);
+      for (int idata = 0; idata < ndata*ndata; idata++) {
+          sigmat->m[idata] += iQuadFactor * F->m[idata] * B->m[idata];
+      }
+      delete B, F;
+    }
+  }  // end quadrature loop
+}
+
+void PMatrix::PerformPPEnergySumThisNode(CMATRIX* B_rr,
+                                        const int is,
+                                        const int iq,
+                                        const kGPP& Gpp,
+                                        const bool* acceptEps,
+                                        const std::vector<double>& pp_wp,
+                                        const std::vector<int>& pp_idx,
+                                        const WINPAIR& winpair,
+                                        const int inode,
+                                        const bool IsHGL,
+                                        const bool IsFirstHGL) {
+  assert(pp_wp.size() == pp_idx.size());
+
+  CMATRIX* const A_gAlpha  = Gpp.S[is][iq];
+  double* const gpp_eig    = Gpp.eigval[is][iq];
+  double* const  gpp_omsq  = Gpp.omsq[is][iq];
+
+  const double tau_u     = winpair.nodes[inode];
+  const double zeta      = winpair.zeta;  // 1.0 / sqrt(winpair.gap * winpair.bw);
+  const double gamma     = winpair.gamma;
+  const double wp_min    = winpair.w2[0];
+  const int Nb           = pp_idx.size();
+  const int ng           = Gpp.ng[iq];
+  GSPACE* const g        = Gpp.vc[iq].gs;
+
+  for (int j = 0; j < Nb; j++) {
+    double omsq_j = gpp_omsq[pp_idx[j]];
+    // if (1) {
+    if (omsq_j > 0) {
+      double sigma_j = gpp_eig[pp_idx[j]];
+      double omega_j = sqrt(omsq_j);
+      // double omega_j = 1000000;
+
+      double factor  = sigma_j*omega_j/2.0;
+      // double factor  = sigma_j/2.0;
+      // printf("omega %f pp_wp %f \n", omega_j, pp_wp[j]);
+      if (!IsHGL) {  // GL factor
+        factor *= exp(-zeta*(omega_j - wp_min)*tau_u);
+      } else {  // HGL factor
+        if (IsFirstHGL) {
+          factor *= sin(omega_j*tau_u*gamma);
+        } else {
+          factor *= cos(omega_j*tau_u*gamma);
+        }  // end if
+      }  // end if
+
+      std::complex<double> B_r[ndata] = {0.0};
+      
+      int gidx = 0;
+      for (int inr=0; inr < ndata; inr++) {
+        B_r[inr] = (0, 0);
+        if (acceptEps[inr]) {
+          B_r[gidx] = A_gAlpha->get(gidx, pp_idx[j]);
+          gidx++;
+        }
+      }
+      // for (int gidx=0; gidx < ng; gidx++) {
+      //   B_r[gidx] = A_gAlpha->get(gidx, pp_idx[j]);
+      // }
+      
+
+      forward_fft(nfft, ng, g, B_r, 1.);
+      // setup_fftw_3d(nfft,1);
+      // put_into_fftbox(nfft,B_r,in_pointer);
+      // do_fftw();
+      // fftbox_to_array(ndata,out_pointer,B_r,1);
+
+      char transformT = 'C';
+      char transform  = 'N';
+      int Lone        = 1;
+      double one    = 1.0;
+      
+      // GEMM   C:= alpha*A*B + beta*C
+      // GEMM   B_rr->m := alpha*B_r*B_r^H + beta*B_rr->m (alpha = factor, beta = 1.0)
+      myGEMM(&transform, &transformT, &ndata, &ndata, &Lone,  &factor, B_r, &ndata, B_r, &ndata, &one, B_rr->m, &ndata);
+      // B_rr->element_sum();
+      // printf("PPSUM factor %f sigma %f omega %f tau_u %f wp_min %f zeta %f pp_wp_j %f Brr_sum %f\n", factor, sigma_j, omega_j, tau_u, wp_min, zeta, pp_wp[j], B_rr->esum.real());
+    }
+  }
+}
+
+void PMatrix::PerformStateSumThisNode(CMATRIX* fmat,
+                                    const int& is,
+                                    const int& ik,
+                                    const int& ikq,
+                                    const WAVEFUNCTION& WFN,
+                                    const std::vector<double>& state_e,
+                                    const std::vector<int>& state_idx,
+                                    const WINPAIR& winpair,
+                                    const int& inode,
+                                    const bool& IsHGL,
+                                    const bool& IsFirstHGL,
+                                    const int uklpp[3]) {
+  assert(state_e.size() == state_idx.size());
+  PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
+  // std::complex<double>* psiRk_n1  = WFN.psiR[is][ik]->coeff[n1];
+  // std::complex<double>* psiRk_n2  = WFN.psiR[is][ik]->coeff[n2];
+
+  double tau_u      = winpair.nodes[inode];
+  double zeta       = winpair.zeta;
+  double gamma      = winpair.gamma;
+  double state_emax = winpair.w1[1];
+  int Na            = state_idx.size();
+
+  
+  for (int i = 0; i < Na; i++) {
+    complex* psiRkq_i = new complex[psi_ndata_local];
+    for (int i=0; i<ndata; i++){
+      psiRkq_i[i] = psi_cache->psis[ikq][i][region_ridx*psi_ndata_local+i];
+    }
+
+    std::complex<double>* psiRkq_i  = WFN.psiR[is][ikq]->coeff[state_idx[i]];
+    std::complex<double>* fr1 = new std::complex<double>[ndata];
+
+    compute_fr(fr1, psiRkq_i, uklpp);
+
+    double factor;
+    if (!IsHGL) {
+      factor = exp(-zeta * (state_emax - state_e[i])*tau_u);
+      // factor = exp(-zeta * (state_emax - state_e[i])*tau_u);
+    } else {  // HGL
+      if (IsFirstHGL) {
+        factor = cos(tau_u*state_e[i]*gamma);
+      } else {
+        factor = sin(tau_u*state_e[i]*gamma);
+      }
+    }
+    // printf("i: %d, inode: %d, State factor: %lf, tau_u: %lf, zeta %lf\n", i, inode, factor, tau_u, zeta);
+    // LAPACK
+    char transformT = 'C';
+    char transform  = 'N';
+    int Lone        = 1;
+    double beta    = 1.0;
+    // GEMM   C:= alpha*A*B + beta*C
+    // GEMM   fmat->m := alpha*fr1^C*fr1 + beta*fmat->m (alpha = factor, beta = 1.0)
+    // for (int i = 0; i < 10; i++) {
+    //   printf("%f\n", fr1[i]);
+    // }
+    // fmat->printDiag("debug/fmat_diag0.dat");
+    myGEMM(&transform, &transformT, &ndata, &ndata, &Lone,  &factor, fr1, &ndata, fr1, &ndata, &beta, fmat->m, &ndata);
+    // fmat->printDiag("debug/fmat_diag.dat");
+    
+    delete [] fr1;
+    // delete [] fr2;
+  }
+}
+
+
+void PMatrix::compute_fr(std::complex<double>* fr, const std::complex<double>* psikq, const int uklpp[3]){
+
+  // set f_r
+  for(int i=0; i<ndata; i++){
+      fr[i] = psikq[i];
+  }
+  // Need to modify psikq if umklapp vector is not zero
+  if( uklpp[0]!=0 || uklpp[1]!=0 || uklpp[2]!=0 ){
+    std::complex<double> psikq_tmp[ndata];
+    modify_state_Uproc(fr, uklpp, nfft, sys);
+  }
+}
+
+void PMatrix::sigma_cubic_main(std::complex<double>* sigma,
+                              const int& is,
+                              const int& ik,
+                              const double& w,
+                              const std::vector<std::pair<int, int>>& n12,
+                              const bool& bIsOccupied,
+                              WINDOWING& WIN
+                        ) {
+  int nq = nkpt;  // (kayahans FIXME)
+  PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
+  double*** e_occ = gwbse->gw_epsilon.Eocc;
+  double*** e_unocc = gwbse->gw_epsilon.Eunocc;
+  // 1. Loop over q-points
+  for (int iq = 0; iq < nq; iq++) {
+    unsigned ikq;
+    int umklapp[3];
+    kqIndex(ik, ikq, umklapp);
+    double* gpp_eig  = psi_cache->get_gpp_eig();
+    double* gpp_omsq = psi_cache->get_gpp_omsq();
+    std::vector<double> psi_eig;// shifted state eigenvalues
+    double* _eig_occ = e_occ[is][ikq];
+    double* _eig_unocc = e_unocc[is][ikq];
+    std::copy(_eig_occ, _eig_occ+nocc, back_inserter(psi_eig));
+    std::copy(_eig_unocc, _eig_unocc+nunocc, back_inserter(psi_eig));
+
+    CMATRIX* S = Gpp.S[is][iq];
+    int state_start_index = 0;
+    int state_end_index = sys.nocc;
+    if (!bIsOccupied) {
+      state_start_index = sys.nocc;
+      state_end_index   = opts.nstateCh;
+    }
+    // 2. loop over window pairs
+    for (WINPAIR winpair : WIN.winpairs) {
+      std::vector<double> state_e;  // E_v - w or w - E_c
+      std::vector<double> pp_wp;     // PP energies w
+      std::vector<int> state_idx;   // indexes of the state psi in window
+      std::vector<int> pp_idx;      // indexes of the B in window
+      double shiftedStateEnergy = 0.;
+      int window_index = 0;
+      int sigma_window_index;
+      //
+      // start accumulating states in the window pair
+      for (int istate = state_start_index; istate < state_end_index; istate++) {
+        if (bIsOccupied) {
+          shiftedStateEnergy = psi_eig[istate] - w;  // E_v - w
+          sigma_window_index = 0;
+        } else {
+          shiftedStateEnergy = w - psi_eig[istate];  // w - E_c
+          sigma_window_index = 1;
+        }
+        if (winpair.in_window(shiftedStateEnergy, window_index, sigma_window_index)) {
+          state_e.push_back(shiftedStateEnergy);
+          state_idx.push_back(istate);
+        }
+      }  // end state loop
+      // end accumulate states in state_e and state_idx
+      // start accumulate PP in the window pair
+      double wpsq = 0;
+      double wp = 0;
+      int ipp = 0;
+      window_index = 1;
+      for (int i_ndata = 0; i_ndata < ndata; i_ndata++) {
+        if (acceptEps[i_ndata]) {
+          wpsq = gpp_omsq[ipp];
+          wp = sqrt(wpsq);
+          // Select w2>0 windows only!
+          if (wpsq > 0.0) {
+            if (winpair.in_window(wp, window_index, sigma_window_index)) {
+              pp_wp.push_back(wp);
+              pp_idx.push_back(ipp);
+            }
+          }
+          ipp++;
+        }
+      }  // end accumulate pp loop
+      // Important!
+      // We want the denominator to be always negative or positive.
+      // In this code it is assumed to be always negative for GL nodes.
+      // Ev - w  and w - Ec are always negative
+      // Normally the terms in the denominator are 1/(w - Ev + wp) and 1/(w - Ec - wp)
+      // To keep the 1/(ai-bj) form, we rewrite the as:
+      // -1/((Ev-w) - wp)
+      // When 1/(ai-bj) is always negative, it means that zeta should be negative number.
+      // Hence, in the succeeding functions:
+      //  cubic_sigma_per_window
+      //  PerformPPEnergySumThisNode
+      //  PerformStateSumThisNode
+      // we use zeta = - winpair.zeta;
+
+      if (state_e.size() > 0 && pp_wp.size() > 0) {
+        cubic_sigma_per_window(sigmat, is, ik, iq, ikq, WFN, Gpp, winpair, g, acceptEps, state_e, state_idx, pp_wp, pp_idx, uklpp);
+      }
+    }  // end winpair loop
+    delete g;
+    delete[] accept;
+    delete[] acceptEps;
+  }  // end q-loop
+  // \sum_q \Sigma(w)rr'^q is calculated above
+  // Now calculate <n1|\sum_q\Sigma(w)rr'^q|n2>
+  int i = 0;
+  for (std::pair<int, int> in12 : n12) {
+    std::complex<double>* psiRk_n1  = WFN.psiR[is][ik]->coeff[in12.first];
+    std::complex<double>* psiRk_n2  = WFN.psiR[is][ik]->coeff[in12.second];
+    char transformT = 'C';
+    char transform  = 'N';
+    int    Lone   = 1;
+    double beta   = 0.0;
+    double factor = 1.0;
+    std::complex<double> sigma_n2[ndata] = {0.0};
+    std::complex<double> n1_sigma_n2[1]  = {0.0};
+    myGEMM(&transform,  &transform, &ndata, &Lone, &ndata, &factor, sigmat->m, &ndata, psiRk_n2, &ndata, &beta, sigma_n2, &ndata);
+    myGEMM(&transformT, &transform, &Lone,  &Lone, &ndata, &factor, psiRk_n1, &ndata, sigma_n2, &ndata, &beta, n1_sigma_n2, &Lone);
+    sigma[i] = n1_sigma_n2[0].real();
+    i++;
+  }
+}
+
+void PMatrix::cubicSigma(std::complex<double> w,
+                        const int& is,
+                        const int& ik,
+                        const SIGMAINDICES& iwn12,
+                        WINDOWING& WIN
+                        ) {
+  double totsum = 0;
+  const bool positive(true);
+  const double w = iwn12.w;
+  const std::vector<std::pair<int, int>> n12 = iwn12.n12;
+  int n12_size = n12.size();
+  
+  // This can ideally be done only once
+  PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
+  WINDOWING WIN = psi_cache->getWin();
+  std::vector<double> omsq = psi_cache->get_omsq();
+  WIN.sigma_win(w, omsq, omsq->size());
+  WIN.searchwins("Sigma"); // on the fly windowing optimization
+
+  std::complex<double>* sigma_plus = new std::complex<double>[n12_size];
+  std::complex<double>* sigma_minus = new std::complex<double>[n12_size];
+  sigma_cubic_main(sigma_plus, is, ik, w, n12, positive, WIN);
+  sigma_cubic_main(sigma_minus, is, ik, w, n12, !positive, WIN);
+}
+
+void PMatrix::sigma() {
+  GWBSE *gwbse = GWBSE::get();
+  // Sigma parameters mtxels, w should later be read from input
+  int nkpt = gwbse->gw_parallel.K;
+  int nspin = 1; // TODO (kayahans) hardcoded
+  std::complex<double> w = 1.000;
+  std::vector<SIGMAINDICES> sigma_index_list;
+  SIGMAINDICES n44(w, 4,4);
+  SIGMAINDICES n55(w, 5,5);
+  sigma_index_list.push_back(n44);
+  sigma_index_list.push_back(n55);
+
+  // Set up regioning data
+  psi_ndata_local = config.tile_rows;
+  psi2_ndata_local = config.tile_rows * config.tile_rows;
+  region_ridx = 0;
+  for(int r_i=0;r_i<psi_cache->regions.size();r_i++)
+    if(start_row == psi_cache->regions[r_i].second) {
+      region_ridx = r_i;
+      break;
+    }
+
+  region_cidx = 0;
+  for(int r_i=0;r_i<psi_cache->regions.size();r_i++)
+    if(start_col == psi_cache->regions[r_i].second) {
+      region_cidx = r_i;
+      break;
+    }
+  
+  // Calculate sigma
+  for(int ik = 0; ik<nkpt; ik++) {
+    for(int is = 0; is<nspin; is++) {
+      cubicSigma(w, is, ik, sigma_index_list);
+    }
+  }
+}
+
 void PMatrix::generateEpsilon(CProxy_EpsMatrix proxy, std::vector<int> accept){
   int inew = 0;
   PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
@@ -121,7 +879,7 @@ void PMatrix::generateEpsilon(CProxy_EpsMatrix proxy, std::vector<int> accept){
     }
   }
 }
- 
+
 void PMatrix::reportPTime() {
   CkReduction::statisticsElement stats(total_time);
   int tuple_size = 2;
