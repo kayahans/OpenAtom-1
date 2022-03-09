@@ -491,6 +491,7 @@ module controller {
       /************************************************************************/
       serial {
         START_STEP("SELF ENERGY COMPUTATIONS COMPLETED");
+        Ckprintf("Kayahan\n");
         eps_matrix2D_X_proxy.createCopy(s_matrix2D_proxy, false);
       }
       when copy_complete() serial {
