@@ -19,6 +19,28 @@ class PsiMessage : public CMessage_PsiMessage {
     complex* psi;
 };
 
+class GppVMessage : public CMessage_GppVMessage {
+  public:
+    GppVMessage(unsigned s, complex* _eigv) : size(s) {
+      std::copy(_eigv, _eigv+size, eigv);
+      // std::copy(_eige, _eige+size, eige);
+    }
+    unsigned spin_index, q_index, alpha_idx, size;
+    complex* eigv;
+    // double* eige;
+};
+
+class GppEMessage : public CMessage_GppEMessage {
+  public:
+    GppEMessage(unsigned s, double* _eige) : size(s) {
+      // std::copy(_eigv, _eigv+size, eigv);
+      std::copy(_eige, _eige+size, eige);
+    }
+    unsigned spin_index, q_index, size;
+    // complex* eigv;
+    double* eige;
+};
+
 // Message sent between PMatrix chares to exchange data during a transpose.
 class TransposeMessage : public CMessage_TransposeMessage {
   public:

@@ -5,6 +5,15 @@ module messages {
     complex psi[];
   };
 
+  // A message used to package and send around GPP eigenvalue/vector arrays
+  message GppVMessage {
+    complex eigv[];
+  };
+
+ // A message used to package and send around GPP eigenvalue/vector arrays
+  message GppEMessage {
+    double eige[];
+  };
   // A message containing data being moved during a transpose
   message TransposeMessage {
     complex data[];

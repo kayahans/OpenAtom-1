@@ -466,11 +466,10 @@ void PMatrix::PerformPPEnergySumThisNode(const int is,
   assert(pp_wp.size() == pp_idx.size());
   PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
 
-
-  // double* const gpp_eig; // TODO  = psi_cache->get_gpp_eig();
-  // double* const gpp_omsq; // TODO = psi_cache->get_gpp_omsq();
-  double*  gpp_eig;
-  double*  gpp_omsq;
+  double* const gpp_eig = psi_cache->get_gpp_eige(iq);
+  double* const gpp_omsq = psi_cache->get_gpp_omsq(iq);
+  // double*  gpp_eig;
+  // double*  gpp_omsq;
 
   const double tau_u     = winpair.nodes[inode];
   const double zeta      = winpair.zeta;  // 1.0 / sqrt(winpair.gap * winpair.bw);
@@ -499,7 +498,7 @@ void PMatrix::PerformPPEnergySumThisNode(const int is,
         }  // end if
       }  // end if
 
-      complex* B_r; // TODO = psi_cache->get_gpp_br(pp_idx[j]);
+      complex* B_r = psi_cache->get_gpp_eigv(iq, pp_idx[j]);
 
 #ifdef USE_LAPACK
       char transformT = 'C';
@@ -614,8 +613,8 @@ void PMatrix::sigma_cubic_main(std::complex<double>* sigma,
     unsigned ikq;
     int umklapp[3];
     kqIndex(ik, ikq, umklapp);
-    double* gpp_eig; // TODO = psi_cache->get_gpp_eig();
-    double* gpp_omsq; // TODO = psi_cache->get_gpp_omsq();
+    double* gpp_eig = psi_cache->get_gpp_eige(iq);
+    double* gpp_omsq = psi_cache->get_gpp_omsq(iq);
     std::vector<double> psi_eig;// shifted state eigenvalues
     double* _eig_occ = e_occ[is][ikq];
     double* _eig_unocc = e_unocc[is][ikq];

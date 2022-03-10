@@ -5,6 +5,9 @@ module psi_cache {
   nodegroup PsiCache {
     entry PsiCache();
     entry [exclusive] void receivePsi(PsiMessage*);
+    entry [exclusive] void receiveGppV(GppVMessage*);
+    entry [exclusive] void receiveGppE(GppEMessage*);
+    entry [exclusive] void receiveGppO(GppEMessage*);
     entry [exclusive] void send_rhodata(PsiMessage*);
     entry [exclusive] void computeFs(PsiMessage*);
     entry void reportFTime();
