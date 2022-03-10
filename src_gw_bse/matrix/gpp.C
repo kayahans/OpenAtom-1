@@ -474,38 +474,50 @@ void Gpp::debug() {
   // contribute(CkCallback(CkReductionTarget(Controller, gpp_debug_complete), controller_proxy));
 }
 
-void Gpp::sendToCache(int _size) {
+void Gpp::sendToCacheV(int _size) {
   unsigned size = _size;
-  printf("GPP1d %d %d %d %u\n", thisIndex.x, thisIndex.y, config.tile_rows, size);
+  // printf("GPP1d %d %d %d %u\n", thisIndex.x, thisIndex.y, config.tile_rows, size);
   if (config.chareCols() != 1) {
     CkAbort("GPP must be row decomposed!\n");
   }
-  int n = 0;
-  complex* new_data;
-  new_data = new complex[size];
-  for(int j=0;j<size;j++) {
-    new_data[n] = data[j];
-    n++;
+  // TODO keep it like this for now 
+  if (thisIndex.x < size) {
+    int n = 0;
+    complex* new_data;
+    new_data = new complex[size];
+    int col_idx = thisIndex.x;
+    for(int j=0;j<size;j++) {
+      new_data[n] = data[j];
+      // printf("col_idx %d idx %d data %f\n", col_idx, j, data[j].re);
+      n++;
+    }
+    
+    GppVMessage* msg;
+    msg = new (size) GppVMessage(size, new_data);
+    msg->spin_index = 0; // TODO 
+    msg->q_index = qindex;
+    msg->alpha_idx = col_idx;
+    psi_cache_proxy.receiveGppV(msg);
   }
-  int col_idx = thisIndex.x;
-  GppVMessage* msg;
-  msg = new (size) GppVMessage(size, new_data);
-  msg->spin_index = 0; // TODO 
-  msg->q_index = qindex;
-  msg->alpha_idx = col_idx;
-  psi_cache_proxy.receiveGppV(msg);
-  
-  GppEMessage* msge;
-  msge = new (size) GppEMessage(size, eigval);
-  msge->spin_index = 0; // TODO 
-  msge->q_index = qindex;
-  psi_cache_proxy.receiveGppE(msge);
+}
 
-  GppEMessage* msgo;
-  msgo = new (size) GppEMessage(size, omsq);
-  msgo->spin_index = 0; // TODO 
-  msgo->q_index = qindex;
-  psi_cache_proxy.receiveGppO(msgo);
+void Gpp::sendToCacheEO(int _size) {
+  unsigned size = _size;
+  // printf("GPP2d %d %d %d %u\n", thisIndex.x, thisIndex.y, config.tile_rows, size);
+  // TODO keep it like this for now since GPP array size should always be larger than num nodes
+  if (thisIndex.x == 0 && thisIndex.y == 0) {
+    GppEMessage* msge;
+    msge = new (size) GppEMessage(size, eigval);
+    msge->spin_index = 0; // TODO 
+    msge->q_index = qindex;
+    psi_cache_proxy.receiveGppE(msge);
+
+    GppEMessage* msgo;
+    msgo = new (size) GppEMessage(size, omsq);
+    msgo->spin_index = 0; // TODO 
+    msgo->q_index = qindex;
+    psi_cache_proxy.receiveGppO(msgo);
+  }
 
 }
 #include "gpp.def.h"

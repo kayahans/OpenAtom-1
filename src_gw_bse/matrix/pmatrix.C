@@ -396,7 +396,8 @@ for(int i=0;i<ndata*ndata;i++)
 
 void PMatrix::sigma_init(std::vector<int> _accept) {
   accept = _accept;
-  // contribute(CkCallback(CkReductionTarget(Controller, sigma_n3_initialized), controller_proxy));
+  // printf("sigma %d %d %f\n", thisIndex.x, thisIndex.y, accept[0]);
+  contribute(CkCallback(CkReductionTarget(Controller, sigma_n3_initialized), controller_proxy));
 }
 
 void PMatrix::cubic_sigma_per_window(const int is,

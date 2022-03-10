@@ -88,7 +88,7 @@ module controller {
     entry [reductiontarget] void transferToGpp_complete();
     entry [reductiontarget] void mpi_received_complete();
     entry [reductiontarget] void mpi_complete();
-    // entry [reductiontarget] void sigma_n3_initialized();
+    entry [reductiontarget] void sigma_n3_initialized();
     entry [reductiontarget] void readComplete(bool success);
     entry [reductiontarget] void writeComplete(bool success);
     entry [reductiontarget] void verifyComplete(bool success);
@@ -541,9 +541,13 @@ module controller {
 //       }
       // TODO(kayahans): change here later
       when GppFormed() serial{
-        eps_matrix2D_X_proxy.bareExchange();
+        // eps_matrix2D_X_proxy.bareExchange();
+        pmatrix2D_proxy.sigma_init(accept_result);
       }
-
+      when sigma_n3_initialized() serial {
+        CkPrintf("SIGMA INITIALIZED\n");
+        pmatrix2D_proxy.sigma();
+      }
       when bareExchangeComplete(CkReductionMsg* msg) serial {
         CkReduction::tupleElement* results = NULL;
         int num_reductions = 0;
@@ -815,7 +819,8 @@ module controller {
         //   gpp1D_proxy.debug();
         // }
         when copyComplete(bool success) serial {
-          gpp1D_proxy.sendToCache(real_epsilon_size);
+          gpp1D_proxy.sendToCacheV(real_epsilon_size);
+          gpp2D_proxy.sendToCacheEO(real_epsilon_size);
         }        
         // TODO(kayahans): FFT back to R space
         when gppVCachesFilled(), gppECachesFilled(), gppOCachesFilled() serial {  

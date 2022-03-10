@@ -176,9 +176,11 @@ PsiCache::PsiCache() {
 
   gpp_eigv = new complex**[num_q];
   gpp_eige = new double*[num_q];
+  gpp_omsq = new double*[num_q];
   for(int iq = 0; iq < num_q; iq++) {
     gpp_eigv[iq] = new complex* [ng];
     gpp_eige[iq] = new double[ng];
+    gpp_omsq[iq] = new double[ng];
     for (int ia = 0; ia < num_alpha; ia++) {
       gpp_eigv[iq][ia] = new complex [ng];
     }
@@ -377,15 +379,17 @@ void PsiCache::receiveGppV(GppVMessage* msg) {
   if (msg->spin_index != 0) {
     CkAbort("Error: We don't support multiple spins yet!\n");
   }
-  // CkAssert(msg->q_index < K);
-  // CkAssert(msg->size == ng);
-  // CkAssert(msg->alpha_idx < ng);
-  printf("GPPV %u %u %u\n", msg->q_index, msg->alpha_idx, msg->size);
+  CkAssert(msg->q_index < K);
+  CkAssert(msg->size == ng);
+  CkAssert(msg->alpha_idx < ng);
+  unsigned size = msg->size;
   // std::copy(msg->eigv, msg->eigv+ng, gpp_eigv[msg->q_index][msg->alpha_idx]);
   // std::copy(msg->eige, msg->eige+ng, gpp_eige[msg->q_index]);
   fflush(stdout);
   gppv_received++;
+  
   if(gppv_received == ng) {
+    // printf("GPPV %u %u %u %d\n", msg->q_index, msg->alpha_idx, msg->size, gppv_received);
     contribute(CkCallback(CkReductionTarget(Controller,gppVCachesFilled), controller_proxy));
     delete msg;    
   }
@@ -396,15 +400,19 @@ void PsiCache::receiveGppE(GppEMessage* msg) {
   if (msg->spin_index != 0) {
     CkAbort("Error: We don't support multiple spins yet!\n");
   }
-  // CkAssert(msg->q_index < K);
-  // CkAssert(msg->size == ng);
-
-  // // std::copy(msg->eigv, msg->eigv+ng, gpp_eigv[msg->q_index][msg->alpha_idx]);
-  // std::copy(msg->eige, msg->eige+ng, gpp_eige[msg->q_index]);
-  printf("GPPE %u %u\n", msg->q_index, msg->size);
+  CkAssert(msg->q_index < K);
+  CkAssert(msg->size == ng);
+  unsigned size = msg->size;
+  // std::copy(msg->eigv, msg->eigv+ng, gpp_eigv[msg->q_index][msg->alpha_idx]);
+  
+  
   fflush(stdout);
   gppe_received++;
-  if(gppe_received == ng) {
+  
+  
+  if(gppe_received == 1) {
+    // printf("GPPE %u %u %d\n", msg->q_index, msg->size, gppe_received);
+    std::copy(msg->eige, msg->eige+size, gpp_eige[msg->q_index]);
     contribute(CkCallback(CkReductionTarget(Controller,gppECachesFilled), controller_proxy));
     delete msg;    
   }
@@ -415,15 +423,19 @@ void PsiCache::receiveGppO(GppEMessage* msg) {
   if (msg->spin_index != 0) {
     CkAbort("Error: We don't support multiple spins yet!\n");
   }
-  // CkAssert(msg->q_index < K);
-  // CkAssert(msg->size == ng);
-
-  // // std::copy(msg->eigv, msg->eigv+ng, gpp_eigv[msg->q_index][msg->alpha_idx]);
-  // std::copy(msg->eige, msg->eige+ng, gpp_omsq[msg->q_index]);
-  printf("GPPO %u %u\n", msg->q_index, msg->size);
+  CkAssert(msg->q_index < K);
+  CkAssert(msg->size == ng);
+  unsigned size = msg->size;
+  // std::copy(msg->eigv, msg->eigv+ng, gpp_eigv[msg->q_index][msg->alpha_idx]);
+  
+  
   fflush(stdout);
   gppo_received++;
-  if(gppo_received == ng) {
+  // int num_nodes = CkNumNodes();
+  
+  if(gppo_received == 1) {
+    // printf("GPPO %u %u %d\n", msg->q_index, msg->size, gppo_received);
+    std::copy(msg->eige, msg->eige+size, gpp_omsq[msg->q_index]);
     contribute(CkCallback(CkReductionTarget(Controller,gppOCachesFilled), controller_proxy));
     delete msg;    
   }
