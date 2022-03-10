@@ -270,17 +270,18 @@ void WINDOWING::initialize(double*** e_occ, double*** e_unocc, int _nocc, int _n
  * @param omsq GPP mode strength squares
  * @param ng number of G points for each iq
  */
-void WINDOWING::sigma_win(const double _w, double*** const omsq, int* const ng) {
+void WINDOWING::sigma_win(const double _w, double* const omsq, int const ng) {
     omega = _w;
     std::vector<double> _wppsq;
-    for (int is = 0; is < nspin; is++) {
-        for (int iq = 0; iq < nq; iq++) {
-            double* _wpp = omsq[is][iq];
-            int _ng = ng[iq];
-            // int _ng = ng;
+    // for (int is = 0; is < nspin; is++) {
+    //     for (int iq = 0; iq < nq; iq++) {
+            // double* _wpp = omsq[is][iq];
+            double* _wpp = omsq;
+            // int _ng = ng[iq];
+            int _ng = ng;
             _wppsq.insert(_wppsq.end(), _wpp, _wpp+_ng);
-        }
-    }
+    //     }
+    // }
     // print_vector(_wppsq);
     // FIXME using only positive ones here!
     std::vector<double> _wpp_pos;

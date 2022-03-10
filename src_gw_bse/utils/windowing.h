@@ -114,7 +114,7 @@ class WINDOWING {
     initialize(e_occ, e_unocc, nocc,nunocc, nspin, nkpt);
   }
 
-  void sigma_win(const double w, double*** const omsq, int* const ng);
+  void sigma_win(const double w, double* const omsq, int const ng);
   void read_from_file();
   void initialize(double*** e_occ, double*** e_unocc, int nocc, int nunocc, int nspin, int nkpt);
   void printenergies() const;

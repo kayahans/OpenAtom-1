@@ -96,8 +96,7 @@ class PMatrix : public CBase_PMatrix {
                               const int& ik,
                               const double& w,
                               const std::vector<std::pair<int, int>>& n12,
-                              const bool& bIsOccupied,
-                              WINDOWING& WIN);
+                              const bool& bIsOccupied);
     void cubicSigma(const int& is,
                     const int& ik,
                     const SIGMAINDICES& iwn12);

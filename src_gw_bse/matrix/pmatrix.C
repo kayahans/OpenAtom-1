@@ -599,11 +599,11 @@ void PMatrix::sigma_cubic_main(std::complex<double>* sigma,
                               const int& ik,
                               const double& w,
                               const std::vector<std::pair<int, int>>& n12,
-                              const bool& bIsOccupied,
-                              WINDOWING& WIN) {
+                              const bool& bIsOccupied) {
   GWBSE *gwbse = GWBSE::get();
   
   PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
+  WINDOWING* WIN = psi_cache->getWin();
   int nq = gwbse->gw_parallel.K; // for now nq = nkpt TODO kayahans hardcoded
   int nunocc = gwbse->gw_parallel.M;
   int nocc = gwbse->gw_parallel.L;
@@ -616,6 +616,9 @@ void PMatrix::sigma_cubic_main(std::complex<double>* sigma,
     kqIndex(ik, ikq, umklapp);
     double* gpp_eig = psi_cache->get_gpp_eige(iq);
     double* gpp_omsq = psi_cache->get_gpp_omsq(iq);
+    int ng = psi_cache->get_ng();
+    WIN->sigma_win(w, gpp_omsq, ng);
+    WIN->searchwins("Sigma"); // on the fly windowing optimization
     std::vector<double> psi_eig;// shifted state eigenvalues
     double* _eig_occ = e_occ[is][ikq];
     double* _eig_unocc = e_unocc[is][ikq];
@@ -629,7 +632,7 @@ void PMatrix::sigma_cubic_main(std::complex<double>* sigma,
       state_end_index   = nunocc; // opts.nstateCh;  // TODO (kayahans)
     }
     // 2. loop over window pairs
-    for (WINPAIR winpair : WIN.winpairs) {
+    for (WINPAIR winpair : WIN->winpairs) {
       std::vector<double> state_e;  // E_v - w or w - E_c
       std::vector<double> pp_wp;     // PP energies w
       std::vector<int> state_idx;   // indexes of the state psi in window
@@ -726,18 +729,11 @@ void PMatrix::cubicSigma(const int& is,
   const int n12_size = n12.size();
   const double w = iwn12.w;
 
-  // This can ideally be done only once
-  PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
-  WINDOWING* WIN = psi_cache->getWin();
-  double*** omsq; // TODO = psi_cache->get_omsq();
-  int* ng; // TODO
-  WIN->sigma_win(w, omsq, ng);
-  WIN->searchwins("Sigma"); // on the fly windowing optimization
 
   std::complex<double>* sigma_plus = new std::complex<double>[n12_size];
   std::complex<double>* sigma_minus = new std::complex<double>[n12_size];
-  // sigma_cubic_main(sigma_plus, is, ik, w, n12, positive, WIN);
-  // sigma_cubic_main(sigma_minus, is, ik, w, n12, !positive, WIN);
+  sigma_cubic_main(sigma_plus, is, ik, w, n12, positive);
+  sigma_cubic_main(sigma_minus, is, ik, w, n12, !positive);
 }
 
 void PMatrix::sigma() {
@@ -775,6 +771,7 @@ void PMatrix::sigma() {
   // Calculate sigma
   for(int ik = 0; ik<nkpt; ik++) {
     for(int is = 0; is<nspin; is++) {
+      printf("%d %d cubic\n",ik, is);
       cubicSigma(is, ik, n44);
     }
   }
