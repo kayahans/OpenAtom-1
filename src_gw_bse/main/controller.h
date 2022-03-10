@@ -159,6 +159,9 @@ class PsiCache : public CBase_PsiCache {
     PsiCache();
 
     void receivePsi(PsiMessage*);
+    void receiveGppV(GppVMessage*);
+    void receiveGppE(GppEMessage*);
+    void receiveGppO(GppEMessage*);
     void computeFs(PsiMessage*);
     void send_rhodata(PsiMessage*);
     void reportFTime();
@@ -169,11 +172,15 @@ class PsiCache : public CBase_PsiCache {
     std::vector<double> get_ga();
     std::vector<double> get_gb();
     std::vector<double> get_gc();
-    int get_ng();
+    unsigned get_ng();
 
     double getVCoulb0();
     complex* getStates();
     complex* getRhoData();
+    double* get_gpp_eige(int qindex);
+    double* get_gpp_omsq(int qindex);
+    complex* get_gpp_eigv(int qindex, int alpha);
+
     int* getRhosize();
     bool in_np_list(int n_index);
     int get_index(int n_index);
@@ -187,6 +194,9 @@ class PsiCache : public CBase_PsiCache {
     int elements;
     int total_elements;
     complex*** psis;
+    complex*** gpp_eigv;
+    double** gpp_eige;
+    double** gpp_omsq;
     std::vector<std::pair<int, int>> regions;
     double get_OccOcc(int k, int iv);
   private:
@@ -211,10 +221,13 @@ class PsiCache : public CBase_PsiCache {
     std::vector<double> ga;
     std::vector<double> gb;
     std::vector<double> gc;
-    int ng;
+    unsigned ng;
     complex* umklapp_factor;
     int n_np;
     int states_received;
+    int gppv_received;
+    int gppe_received;
+    int gppo_received;
     int ndata_rho;
     int *nr;
     int *n_list, *np_list;

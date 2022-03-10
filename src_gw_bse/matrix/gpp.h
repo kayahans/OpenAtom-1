@@ -33,7 +33,7 @@ class Gpp : public CBase_Gpp {
     
     // used in calculate_vc
     double* vcoulb;
-    int ng; // check if this is filtered?
+    unsigned ng; // check if this is filtered?
     
     double factor;
     double* omsq;
@@ -61,4 +61,5 @@ class Gpp : public CBase_Gpp {
     void calculate_vc();
     void recvCopy(std::vector<complex> new_data);
     void recv_eig(std::vector<double> new_data);
+    void sendToCache();
 };
