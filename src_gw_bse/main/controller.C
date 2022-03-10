@@ -380,7 +380,7 @@ void PsiCache::receiveGppV(GppVMessage* msg) {
   // CkAssert(msg->q_index < K);
   // CkAssert(msg->size == ng);
   // CkAssert(msg->alpha_idx < ng);
-  printf("GPPV %d %d %d\n", msg->q_index, msg->alpha_idx, msg->size);
+  printf("GPPV %u %u %u\n", msg->q_index, msg->alpha_idx, msg->size);
   // std::copy(msg->eigv, msg->eigv+ng, gpp_eigv[msg->q_index][msg->alpha_idx]);
   // std::copy(msg->eige, msg->eige+ng, gpp_eige[msg->q_index]);
   fflush(stdout);
@@ -401,7 +401,7 @@ void PsiCache::receiveGppE(GppEMessage* msg) {
 
   // // std::copy(msg->eigv, msg->eigv+ng, gpp_eigv[msg->q_index][msg->alpha_idx]);
   // std::copy(msg->eige, msg->eige+ng, gpp_eige[msg->q_index]);
-  printf("GPPE %d %d\n", msg->q_index, msg->size);
+  printf("GPPE %u %u\n", msg->q_index, msg->size);
   fflush(stdout);
   gppe_received++;
   if(gppe_received == ng) {
@@ -420,11 +420,11 @@ void PsiCache::receiveGppO(GppEMessage* msg) {
 
   // // std::copy(msg->eigv, msg->eigv+ng, gpp_eigv[msg->q_index][msg->alpha_idx]);
   // std::copy(msg->eige, msg->eige+ng, gpp_omsq[msg->q_index]);
-  printf("GPPO %d %d\n", msg->q_index, msg->size);
+  printf("GPPO %u %u\n", msg->q_index, msg->size);
   fflush(stdout);
   gppo_received++;
   if(gppo_received == ng) {
-    contribute(CkCallback(CkReductionTarget(Controller,gppECachesFilled), controller_proxy));
+    contribute(CkCallback(CkReductionTarget(Controller,gppOCachesFilled), controller_proxy));
     delete msg;    
   }
 }

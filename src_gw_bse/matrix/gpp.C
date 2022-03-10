@@ -474,36 +474,35 @@ void Gpp::debug() {
   // contribute(CkCallback(CkReductionTarget(Controller, gpp_debug_complete), controller_proxy));
 }
 
-void Gpp::sendToCache() {
-  // printf("GPP1d %d %d\n", thisIndex.x, thisIndex.y);
+void Gpp::sendToCache(int _size) {
+  unsigned size = _size;
+  printf("GPP1d %d %d %d %u\n", thisIndex.x, thisIndex.y, config.tile_rows, size);
   if (config.chareCols() != 1) {
     CkAbort("GPP must be row decomposed!\n");
   }
-
   int n = 0;
   complex* new_data;
-  new_data = new complex[config.tile_rows];
-  for(int j=0;j<config.tile_rows;j++) {
+  new_data = new complex[size];
+  for(int j=0;j<size;j++) {
     new_data[n] = data[j];
     n++;
   }
-    
   int col_idx = thisIndex.x;
   GppVMessage* msg;
-  msg = new (ng) GppVMessage(ng, new_data);
+  msg = new (size) GppVMessage(size, new_data);
   msg->spin_index = 0; // TODO 
   msg->q_index = qindex;
   msg->alpha_idx = col_idx;
   psi_cache_proxy.receiveGppV(msg);
   
   GppEMessage* msge;
-  msge = new (ng) GppEMessage(ng, eigval);
+  msge = new (size) GppEMessage(size, eigval);
   msge->spin_index = 0; // TODO 
   msge->q_index = qindex;
   psi_cache_proxy.receiveGppE(msge);
 
   GppEMessage* msgo;
-  msgo = new (ng) GppEMessage(ng, omsq);
+  msgo = new (size) GppEMessage(size, omsq);
   msgo->spin_index = 0; // TODO 
   msgo->q_index = qindex;
   psi_cache_proxy.receiveGppO(msgo);

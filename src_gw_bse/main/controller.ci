@@ -56,6 +56,7 @@ module controller {
     entry [reductiontarget] void cachesFilled();
     entry [reductiontarget] void gppVCachesFilled();
     entry [reductiontarget] void gppECachesFilled();
+    entry [reductiontarget] void gppOCachesFilled();
     entry [reductiontarget] void setQIndex();
     entry [reductiontarget] void registrationComplete();
     entry [reductiontarget] void psiComplete();
@@ -814,10 +815,10 @@ module controller {
         //   gpp1D_proxy.debug();
         // }
         when copyComplete(bool success) serial {
-          gpp1D_proxy.sendToCache();
+          gpp1D_proxy.sendToCache(real_epsilon_size);
         }        
         // TODO(kayahans): FFT back to R space
-        when gppVCachesFilled(), gppECachesFilled() serial { 
+        when gppVCachesFilled(), gppECachesFilled(), gppOCachesFilled() serial {  
           STOP_BIG_STEP("GPP FORMED");
           thisProxy.GppFormed();
         }
