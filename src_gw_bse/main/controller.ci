@@ -491,7 +491,6 @@ module controller {
       /************************************************************************/
       serial {
         START_STEP("SELF ENERGY COMPUTATIONS COMPLETED");
-        Ckprintf("Kayahan\n");
         eps_matrix2D_X_proxy.createCopy(s_matrix2D_proxy, false);
       }
       when copy_complete() serial {
@@ -528,15 +527,15 @@ module controller {
       // }
       // Print S-matrix to verify (end)
 
-      for (next_K = 0; next_K < K; next_K++) {
-//send occ and unocc states in bandlist
-        for (next_state = 0; next_state < Bands ; next_state++) {
-          serial {
-            states_proxy(0, next_K, np_list[next_state]-1).sendToComputeF(true);
-          }
-          when prepare_epsilon() serial { }
-        }
-      }
+//       for (next_K = 0; next_K < K; next_K++) {
+// //send occ and unocc states in bandlist
+//         for (next_state = 0; next_state < Bands ; next_state++) {
+//           serial {
+//             states_proxy(0, next_K, np_list[next_state]-1).sendToComputeF(true);
+//           }
+//           when prepare_epsilon() serial { }
+//         }
+//       }
       // TODO(kayahans): change here later
       when GppFormed() serial{
         eps_matrix2D_X_proxy.bareExchange();
@@ -807,7 +806,7 @@ module controller {
       when gpp_omsq_complete() {
         serial {
           STOP_STEP("GPP OMSQ")
-          matrixCopy(gpp1D_proxy, gpp2D_proxy, copyCB);
+          matrixCopy(gpp2D_proxy, gpp1D_proxy, copyCB);
         }
         when copyComplete(bool success) serial {
           gpp1D_proxy.debug();

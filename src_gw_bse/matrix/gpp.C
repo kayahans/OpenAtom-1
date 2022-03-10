@@ -357,10 +357,10 @@ void Gpp::calc_M0() {
           // Mggp[ig1][ig2] = dp12*(vcqg1*vcqg2) * rhoData[gdiffIndex]/ rhoData[0];
           data[IDX_eps(ig1, ig2)] = dp12*(vcqg1*vcqg2) * rdg0;
         }  //end if
-        if (ig1_glob < 30 && ig2_glob < 30 && ig1_glob > 20 && ig2_glob > 20) {
-          CkPrintf("%d %d %.12f %.12f %.12f %f %f %f %f\n", ig1_glob, ig2_glob, dp11, dp12, dp22, vcqg1, vcqg2, rdg0.re, data[IDX_eps(ig1, ig2)].re);
-          // CkPrintf("%f %f %f %f %f %f %d %d %d \n", g1[0], g1[1], g1[2],g2[0], g2[1], g2[2], gdiff[0], gdiff[1], gdiff[2]);
-        }
+        // if (ig1_glob < 30 && ig2_glob < 30 && ig1_glob > 20 && ig2_glob > 20) {
+        //   CkPrintf("%d %d %.12f %.12f %.12f %f %f %f %f\n", ig1_glob, ig2_glob, dp11, dp12, dp22, vcqg1, vcqg2, rdg0.re, data[IDX_eps(ig1, ig2)].re);
+        //   // CkPrintf("%f %f %f %f %f %f %d %d %d \n", g1[0], g1[1], g1[2],g2[0], g2[1], g2[2], gdiff[0], gdiff[1], gdiff[2]);
+        // }
       } else{
           // Mggp[ig1][ig2] = 0.;
           data[IDX_eps(ig1, ig2)] = 0.;
@@ -385,7 +385,7 @@ void Gpp::calc_omsq() {
     end_index = ( end_index < ng) ? end_index : ng;
     for (int i = start_index; i < end_index; i++ ) {
       omsq[i] = data[IDX_eps(i, i)].re * factor / eigval[i];
-      printf("i %d omsq %f %f factor %f data %f\n", i , omsq[i], eigval[i], factor, data[IDX_eps(i, i)].re);
+      // printf("i %d omsq %f %f factor %f data %f\n", i , omsq[i], eigval[i], factor, data[IDX_eps(i, i)].re);
     }
   }
   contribute(CkCallback(CkReductionTarget(Controller, gpp_omsq_complete), controller_proxy));
