@@ -267,6 +267,7 @@ double* PsiCache::get_gpp_omsq(int q) {
 }
 
 complex* PsiCache::get_gpp_eigv(int q, int alpha) {
+  // printf("eigv %d %d\n", q, alpha);
   return gpp_eigv[q][alpha];//tmp;
 }
 
@@ -371,9 +372,12 @@ void PsiCache::receiveGppV(GppVMessage* msg) {
   // std::copy(msg->eige, msg->eige+ng, gpp_eige[msg->q_index]);
   fflush(stdout);
   gppv_received++;
-  
+  // for (int i = 0; i < size; i++) {
+  //   gpp_eigv[msg->q_index][msg->alpha_idx][i] = msg->eigv[i];
+  // }
   if(gppv_received == size) {
     // printf("GPPV %u %u %u %d\n", msg->q_index, msg->alpha_idx, msg->size, gppv_received);
+    // printf("receiveGppv %f %f %d %d\n", gpp_eigv[0][1][0].re, gpp_eigv[0][1][130].re, size, gppv_received);
     contribute(CkCallback(CkReductionTarget(Controller,gppVCachesFilled), controller_proxy));
     delete msg;    
   }

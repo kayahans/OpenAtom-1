@@ -90,6 +90,7 @@ module controller {
     entry [reductiontarget] void mpi_received_complete();
     entry [reductiontarget] void mpi_complete();
     entry [reductiontarget] void sigma_n3_initialized();
+    entry [reductiontarget] void sigma_n3_complete();
     entry [reductiontarget] void readComplete(bool success);
     entry [reductiontarget] void writeComplete(bool success);
     entry [reductiontarget] void verifyComplete(bool success);
@@ -543,11 +544,16 @@ module controller {
       // TODO(kayahans): change here later
       when GppFormed() serial{
         // eps_matrix2D_X_proxy.bareExchange();
+        START_STEP("SIGMA INITIALIZED");
         pmatrix2D_proxy.sigma_init(accept_result);
       }
       when sigma_n3_initialized() serial {
-        CkPrintf("SIGMA INITIALIZED\n");
+        STOP_STEP("SIGMA INITIALIZED");
+        START_STEP("SIGMA CALCULATED");
         pmatrix2D_proxy.sigma();
+      }
+      when sigma_n3_complete() serial {
+        STOP_BIG_STEP("SIGMA CALCULATED");
       }
       when bareExchangeComplete(CkReductionMsg* msg) serial {
         CkReduction::tupleElement* results = NULL;

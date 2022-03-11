@@ -395,7 +395,7 @@ for(int i=0;i<ndata*ndata;i++)
 
 
 void PMatrix::sigma_init(std::vector<int> _accept) {
-  // accept = _accept;
+  accept = _accept;
   // printf("sigma %d %d %f\n", thisIndex.x, thisIndex.y, accept[0]);
   contribute(CkCallback(CkReductionTarget(Controller, sigma_n3_initialized), controller_proxy));
 }
@@ -483,7 +483,7 @@ void PMatrix::sigma() {
         state_end_index   = nunocc; // opts.nstateCh;  // TODO (kayahans)
       }
       // 3. loop over window pairs
-      /*
+      
       for (WINPAIR winpair : WIN.winpairs) {
         std::vector<double> state_e;  // E_v - w or w - E_c
         std::vector<double> pp_wp;     // PP energies w
@@ -492,9 +492,10 @@ void PMatrix::sigma() {
         double shiftedStateEnergy = 0.;
         int window_index = 0;
         int sigma_window_index;
-
+        // printf("%d %d %f %f %f %f\n", thisIndex.x, thisIndex.y, winpair.w1[0], winpair.w1[1], winpair.w2[0], winpair.w2[1]);
         // istate loop: start accumulating states in the window pair
         for (int istate = state_start_index; istate < state_end_index; istate++) {
+          // printf("%d %d %d %f %f\n", thisIndex.x, thisIndex.y, istate, psi_eig[istate] - w, w);
           if (bIsOccupied) {
             shiftedStateEnergy = psi_eig[istate] - w;  // E_v - w
             sigma_window_index = 0;
@@ -512,6 +513,7 @@ void PMatrix::sigma() {
         double wp = 0;
         int ipp = 0;
         window_index = 1;
+        nfft = gwbse->gw_parallel.fft_nelems;
         int ndata = nfft[0] * nfft[1] * nfft[2];
         // i_ndata loop: start accumulate PP in the window pair
         for (int i_ndata = 0; i_ndata < ndata; i_ndata++) {
@@ -542,11 +544,10 @@ void PMatrix::sigma() {
         //  PerformPPEnergySumThisNode
         //  PerformStateSumThisNode
         // we use zeta = - winpair.zeta;
-        /*
+        
         // 4. If any states/PP are in this window pair
         if (state_e.size() > 0 && pp_wp.size() > 0) {
           // cubic_sigma_per_window(is, ik, iq, ikq, winpair, state_e, state_idx, pp_wp, pp_idx, umklapp);
-          double iQuadFactor;
           // for (int idata = 0; idata < ndata*ndata; idata++) {
           //   sigmat->m[idata] = 0.0;
           // }
@@ -555,16 +556,18 @@ void PMatrix::sigma() {
             // Quadrature constants
             int nloops;
             bool bIsFirstLoop;
-            bool bIsHGL         = winpair.isHgl;
-            double tau_u        = winpair.nodes[inode];
-            double w_u          = winpair.weights[inode];
-            double zeta         = winpair.zeta;
-            double gap          = winpair.gap;
-            const double gamma  = winpair.gamma;
-            double state_emax   = winpair.w1[1];
-            const double wp_min = winpair.w2[0];
-            const int Na        = state_idx.size();
-            const int Nb        = pp_idx.size();
+            double iQuadFactor;
+            const bool bIsHGL         = winpair.isHgl;
+            const double tau_u        = winpair.nodes[inode];
+            const double w_u          = winpair.weights[inode];
+            const double zeta         = winpair.zeta;
+            const double gap          = winpair.gap;
+            const double gamma        = winpair.gamma;
+            const double state_emax   = winpair.w1[1];
+            const double wp_min       = winpair.w2[0];
+            const int Na              = state_idx.size();
+            const int Nb              = pp_idx.size();
+            // printf("Pindex %d %d %f %f %f %f %d %f %f %f %f %f\n", thisIndex.x, thisIndex.y, winpair.w1[0], winpair.w1[1], winpair.w2[0], winpair.w2[1], inode, w_u, tau_u, zeta, gap, gamma);
             // Hermite GL or regular GL?
             if (bIsHGL) {
               iQuadFactor = w_u * winpair.gamma;  // MJ used -gamma here, check why and how it differs from zeta
@@ -576,6 +579,7 @@ void PMatrix::sigma() {
               bIsFirstLoop = false;
             }
             // 6. iLoop : HGL needs to calcualte B_p and f_n twice (Eq. 35)
+            
             for (int iLoop=0; iLoop < nloops; iLoop++) {
               
               F_m = new complex[tile_size]; // psi rr' tile
@@ -612,8 +616,8 @@ void PMatrix::sigma() {
                   char transform  = 'N';
                   int Lone        = 1;
                   double one    = 1.0;
-                  
-                  myGEMM(&transform, &transformT, &tile_size, &tile_size, &Lone,  &factor, B_r, &tile_size, B_r, &tile_size, &one, B_m, &tile_size);
+                  // myGEMM( &transform, &transformT, &ndata, &ndata, &this_nocc, &Lalpha, _psis_occ2, &ndata, _psis_occ1, &ndata, &Lbeta, focc, &ndata);
+                  myGEMM(&transform, &transformT, &psi_ndata_local, &psi_ndata_local, &Lone,  &factor, B_r, &psi_ndata_local, B_r, &psi_ndata_local, &one, B_m, &psi_ndata_local);
 #else
                 Die("Without -DUSE_LAPACK flag, polarizability calculation does not work!");
 #endif
@@ -623,50 +627,56 @@ void PMatrix::sigma() {
               // A_{r,r'} Eq. 35
               // PerformStateSumThisNode(is, ik, ikq, state_e, state_idx, winpair, inode, bIsHGL, bIsFirstLoop, uklpp);
               // 7b. Loop over state energies in window pair
-              for (int i = 0; i < Na; i++) {
-                complex* psiRkq_i = new complex[psi_ndata_local];
-                complex *fr1; //rho-bar matrix
-                for (int i=0; i<tile_size; i++){
-                  psiRkq_i[i] = psi_cache->psis[ikq][i][region_ridx*psi_ndata_local+i];
-                }
-                fr1 = new complex[tile_size];
-                compute_fr(fr1, psiRkq_i, umklapp);
+//               for (int i = 0; i < Na; i++) {
+//                 complex* psiRkq_i = new complex[psi_ndata_local];
+//                 complex *fr1 = new complex[psi_ndata_local]; //rho-bar matrix
+//                 for (int idx=0; idx<psi_ndata_local; idx++){
+//                   psiRkq_i[idx] = psi_cache->psis[ikq][state_idx[i]][region_ridx*psi_ndata_local+idx];
+//                   fr1[idx] = psiRkq_i[idx];
+//                 }
+//                 // TODO later
+//                 // Need to modify psikq if umklapp vector is not zero
+//                 // if( uklpp[0]!=0 || uklpp[1]!=0 || uklpp[2]!=0 ){
+//                 //   complex* psikq_tmp[tile_size];
+//                 //   // TODO modify_state_Uproc(fr, uklpp, nfft, sys);
+//                 // }
 
-                double factor;
-                if (!bIsHGL) {
-                  factor = exp(-zeta * (state_emax - state_e[i])*tau_u);
-                  // factor = exp(-zeta * (state_emax - state_e[i])*tau_u);
-                } else {  // HGL
-                  if (bIsFirstLoop) {
-                    factor = cos(tau_u*state_e[i]*gamma);
-                  } else {
-                    factor = sin(tau_u*state_e[i]*gamma);
-                  }
-                }
-                // printf("i: %d, inode: %d, State factor: %lf, tau_u: %lf, zeta %lf\n", i, inode, factor, tau_u, zeta);
-                // LAPACK
-                char transformT = 'C';
-                char transform  = 'N';
-                int Lone        = 1;
-                double beta    = 1.0;
-#ifdef USE_LAPACK
-                myGEMM(&transform, &transformT, &tile_size, &tile_size, &Lone,  &factor, fr1, &tile_size, fr1, &tile_size, &beta, F_m, &tile_size);
-#else
-                Die("Without -DUSE_LAPACK flag, polarizability calculation does not work!");
-#endif    
-                delete [] fr1;
-              } // end A^p_{rr'}  Eq. 35 (7b)
+//                 double factor;
+//                 if (!bIsHGL) {
+//                   factor = exp(-zeta * (state_emax - state_e[i])*tau_u);
+//                   // factor = exp(-zeta * (state_emax - state_e[i])*tau_u);
+//                 } else {  // HGL
+//                   if (bIsFirstLoop) {
+//                     factor = cos(tau_u*state_e[i]*gamma);
+//                   } else {
+//                     factor = sin(tau_u*state_e[i]*gamma);
+//                   }
+//                 }
+//                 // printf("i: %d, inode: %d, State factor: %lf, tau_u: %lf, zeta %lf\n", i, inode, factor, tau_u, zeta);
+//                 // LAPACK
+//                 char transformT = 'C';
+//                 char transform  = 'N';
+//                 int Lone        = 1;
+//                 double beta    = 1.0;
+// #ifdef USE_LAPACK
+//                 myGEMM(&transform, &transformT, &psi_ndata_local, &psi_ndata_local, &Lone,  &factor, fr1, &psi_ndata_local, fr1, &psi_ndata_local, &beta, F_m, &psi_ndata_local);
+// #else
+//                 Die("Without -DUSE_LAPACK flag, polarizability calculation does not work!");
+// #endif    
+//                 delete [] psiRkq_i;
+//                 delete [] fr1;
+//               } // end A^p_{rr'}  Eq. 35 (7b)
 
-              for (int idata = 0; idata < tile_size; idata++) {
-                  sigma_m[idata] += iQuadFactor * F_m[idata] * B_m[idata];
-              }
+              // for (int idata = 0; idata < tile_size; idata++) {
+              //     sigma_m[idata] += iQuadFactor * F_m[idata] * B_m[idata];
+              // }
+              
               delete [] B_m;
               delete [] F_m;
             } // end iLoop (6)
           }  // end quadrature loop (5)
         } // end if (4)
       }  // end winpair loop (3)
-      */
     }  // end iloop (2)
   } // end bloop (1)
 
@@ -693,7 +703,7 @@ void PMatrix::sigma() {
   //     i++;
   //   }
   // }
-
+  contribute(CkCallback(CkReductionTarget(Controller, sigma_n3_complete), controller_proxy));
 }
 
 void PMatrix::compute_fr(complex* fr, complex* psikq, const int uklpp[3]){
