@@ -25,7 +25,7 @@ class GppVMessage : public CMessage_GppVMessage {
       std::copy(_eigv, _eigv+size, eigv);
       // std::copy(_eige, _eige+size, eige);
     }
-    unsigned spin_index, q_index, alpha_idx, size;
+    int spin_index, q_index, alpha_idx, size;
     complex* eigv;
     // double* eige;
 };
@@ -36,7 +36,7 @@ class GppEMessage : public CMessage_GppEMessage {
       // std::copy(_eigv, _eigv+size, eigv);
       std::copy(_eige, _eige+size, eige);
     }
-    unsigned spin_index, q_index, size;
+    int spin_index, q_index, size, start_idx, tot_sent;
     // complex* eigv;
     double* eige;
 };

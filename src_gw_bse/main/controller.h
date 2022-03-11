@@ -168,6 +168,7 @@ class PsiCache : public CBase_PsiCache {
     complex* getPsi(unsigned, unsigned, unsigned) const;
     complex* getF(unsigned,unsigned) const;
     void setVCoulb(std::vector<double> vcoulb_in, double vcoulb0, std::vector<double> _ga, std::vector<double> _gb, std::vector<double>_gc, int ng);
+    void init_gpp_cache();
     std::vector<double> getVCoulb();
     std::vector<double> get_ga();
     std::vector<double> get_gb();

@@ -22,7 +22,8 @@ module gpp {
     entry void recv_eig(std::vector<double> new_data);    
     entry [sync] PsiMessage* send_data(PsiMessage* msg);
     entry [reductiontarget] void sendToCacheV(int size);
-    entry [reductiontarget] void sendToCacheEO(int size);
+    entry [reductiontarget] void sendToCacheE(int size);
+    entry [reductiontarget] void sendToCacheO(int size);
   }; // end array Gpp
 
   }; // end module

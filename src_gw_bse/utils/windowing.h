@@ -110,7 +110,7 @@ class WINDOWING {
     int nunocc = gwbse->gw_parallel.M;
     int nspin = 1; 
     int nkpt = gwbse->gw_parallel.K;
-    printf("WIN %d %d %d %d\n", nocc, nunocc, nspin, nkpt);
+    // printf("WIN %d %d %d %d\n", nocc, nunocc, nspin, nkpt);
     initialize(e_occ, e_unocc, nocc,nunocc, nspin, nkpt);
   }
 

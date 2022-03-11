@@ -164,10 +164,12 @@ void Gpp::recvCopy(std::vector<complex> new_data) {
 }
 
 void Gpp::recv_eig(std::vector<double> new_data) {
-  eigval = new double[new_data.size()];
-  for(int i=0;i<new_data.size();i++) {
-    eigval[i] = new_data[i];
-    // printf("eig %d %f\n", i, eigval[i]);
+  int x = thisIndex.x;
+  int col = x * eps_rows;
+  eigval = new double[eps_rows];
+  for(int i=0;i<eps_rows;i++) {
+    eigval[i] = new_data[i+col];
+    // printf("eig %d %f\n", i+col, eigval[i]);
   }
 }
 
@@ -181,7 +183,7 @@ void Gpp::calculate_vc() {
   std::copy(vcoulbp.begin(), vcoulbp.end(), vcoulb);
   if(qindex==0)
       vcoulb[0] = psi_cache->getVCoulb0();  
-  omsq = new double [ng];
+  omsq = new double [eps_cols];
   // eigval = new double [ng];
   contribute(CkCallback(CkReductionTarget(Controller, gpp_vc_complete), controller_proxy));
   // Check for garbage collector?
@@ -379,15 +381,16 @@ void Gpp::calc_M0() {
 
 
 void Gpp::calc_omsq() {
-  if (thisIndex.x == thisIndex.y) {
+  // if (thisIndex.x == thisIndex.y) {
     int start_index = thisIndex.x * eps_cols;
     int end_index = (thisIndex.x + 1) * eps_cols;
     end_index = ( end_index < ng) ? end_index : ng;
-    for (int i = start_index; i < end_index; i++ ) {
-      omsq[i] = data[IDX_eps(i, i)].re * factor / eigval[i];
+    for (int i = 0; i < end_index-start_index; i++ ) {
+      // omsq[i] = data[IDX_eps(i, i)].re * factor / eigval[i];
+      omsq[i] = i+start_index;
       // printf("i %d omsq %f %f factor %f data %f\n", i , omsq[i], eigval[i], factor, data[IDX_eps(i, i)].re);
     }
-  }
+  // }
   contribute(CkCallback(CkReductionTarget(Controller, gpp_omsq_complete), controller_proxy));
 }
 
@@ -476,20 +479,18 @@ void Gpp::debug() {
 
 void Gpp::sendToCacheV(int _size) {
   unsigned size = _size;
-  // printf("GPP1d %d %d %d %u\n", thisIndex.x, thisIndex.y, config.tile_rows, size);
+  // printf("GPP1d %d %d %d %d %d %d\n", thisIndex.x, thisIndex.y, config.tile_rows, size,config.chareCols(), config.chareRows());
   if (config.chareCols() != 1) {
     CkAbort("GPP must be row decomposed!\n");
   }
   // TODO keep it like this for now 
   if (thisIndex.x < size) {
-    int n = 0;
     complex* new_data;
     new_data = new complex[size];
     int col_idx = thisIndex.x;
     for(int j=0;j<size;j++) {
-      new_data[n] = data[j];
+      new_data[j] = data[j];
       // printf("col_idx %d idx %d data %f\n", col_idx, j, data[j].re);
-      n++;
     }
     
     GppVMessage* msg;
@@ -497,27 +498,45 @@ void Gpp::sendToCacheV(int _size) {
     msg->spin_index = 0; // TODO 
     msg->q_index = qindex;
     msg->alpha_idx = col_idx;
+    msg->size = size;
     psi_cache_proxy.receiveGppV(msg);
   }
 }
 
-void Gpp::sendToCacheEO(int _size) {
-  unsigned size = _size;
+void Gpp::sendToCacheE(int total_size) {
+  int start_index = thisIndex.x * eps_rows;
+  int end_index = (thisIndex.x + 1) * eps_rows;
+  end_index = ( end_index < total_size) ? end_index : ng;
+  int size = end_index - start_index;
   // printf("GPP2d %d %d %d %u\n", thisIndex.x, thisIndex.y, config.tile_rows, size);
   // TODO keep it like this for now since GPP array size should always be larger than num nodes
-  if (thisIndex.x == 0 && thisIndex.y == 0) {
+  if (thisIndex.y == 0) {
     GppEMessage* msge;
+    // printf("Gpp xy %d %d %f %f %f %f\n", thisIndex.x, thisIndex.y, eigval[0], eigval[end_index-1], omsq[0], omsq[end_index-1]);
     msge = new (size) GppEMessage(size, eigval);
     msge->spin_index = 0; // TODO 
     msge->q_index = qindex;
+    msge->start_idx = start_index;
+    msge->tot_sent = int(total_size/eps_rows) + (total_size % eps_rows != 0);
     psi_cache_proxy.receiveGppE(msge);
+  }
+}
 
+void Gpp::sendToCacheO(int total_size) {
+  int start_index = thisIndex.x * eps_rows;
+  int end_index = (thisIndex.x + 1) * eps_rows;
+  end_index = ( end_index < total_size) ? end_index : ng;
+  int size = end_index - start_index;
+  // printf("GPP2d %d %d %d %u\n", thisIndex.x, thisIndex.y, config.tile_rows, size);
+  // TODO keep it like this for now since GPP array size should always be larger than num nodes
+  if (thisIndex.y == 0) {
     GppEMessage* msgo;
     msgo = new (size) GppEMessage(size, omsq);
     msgo->spin_index = 0; // TODO 
     msgo->q_index = qindex;
+    msgo->start_idx = start_index;
+    msgo->tot_sent = int(total_size/eps_rows) + (total_size % eps_rows != 0);
     psi_cache_proxy.receiveGppO(msgo);
   }
-
 }
 #include "gpp.def.h"

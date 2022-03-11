@@ -69,6 +69,7 @@ module controller {
     entry [reductiontarget] void gpp_fft_complete();
     entry [reductiontarget] void gpp_omsq_complete();
     entry [reductiontarget] void gpp_vc_complete();
+    entry [reductiontarget] void gpp_psi_cache_ready();
     // entry [reductiontarget] void gpp_debug_complete();
     entry [reductiontarget] void s_ready();
     entry [reductiontarget] void m_multiplied();
@@ -819,11 +820,20 @@ module controller {
         //   gpp1D_proxy.debug();
         // }
         when copyComplete(bool success) serial {
+          psi_cache_proxy.init_gpp_cache();
+        }
+        when gpp_psi_cache_ready() serial {
           gpp1D_proxy.sendToCacheV(real_epsilon_size);
-          gpp2D_proxy.sendToCacheEO(real_epsilon_size);
-        }        
+        }
+        when gppVCachesFilled() serial {
+          gpp2D_proxy.sendToCacheE(real_epsilon_size);
+        }
+        when gppECachesFilled() serial {
+          gpp2D_proxy.sendToCacheO(real_epsilon_size);
+        }
         // TODO(kayahans): FFT back to R space
-        when gppVCachesFilled(), gppECachesFilled(), gppOCachesFilled() serial {  
+        when gppOCachesFilled() serial {  
+        // when copyComplete(bool success) serial {          
           STOP_BIG_STEP("GPP FORMED");
           thisProxy.GppFormed();
         }

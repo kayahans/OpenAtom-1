@@ -300,7 +300,7 @@ void WINDOWING::sigma_win(const double _w, double* const omsq, int const ng) {
 
 void WINDOWING::read_from_file() {
   std::string _opt("Sigma");  // Convert char to string
-  printf("reading windows\n");
+  // printf("reading windows\n");
   if (_opt == "Sigma") {
     bool sigma_windows = true;
     int sigma_window_index = 0;
@@ -421,7 +421,7 @@ void WINDOWING::read_from_file() {
     // read gamma
     fscanf(fp, "%lg", &gamma);
     fclose(fp);
-    printf("read_windows done\n");
+    // printf("read_windows done\n");
   }  // end if
 }
 // void WINDOWING::loadparameters(const USRINPUT usrin) {

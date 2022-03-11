@@ -61,45 +61,45 @@ class PMatrix : public CBase_PMatrix {
     void kqIndex(unsigned, unsigned&, int*);
     complex* umklapp_factor;
     void getUmklappFactor(complex*, int[3]);
-    void cubic_sigma_per_window(const int is,
-                                    const int ik,
-                                    const int iq,
-                                    const int ikq,
-                                    const WINPAIR& winpair,
-                                    const std::vector<double>& state_e,
-                                    const std::vector<int>& state_idx,
-                                    const std::vector<double>& pp_e,
-                                    const std::vector<int>& pp_idx,
-                                    const int uklpp[3]);
-    void PerformPPEnergySumThisNode(const int is,
-                                        const int iq,
-                                        const std::vector<double>& pp_wp,
-                                        const std::vector<int>& pp_idx,
-                                        const WINPAIR& winpair,
-                                        const int inode,
-                                        const bool IsHGL,
-                                        const bool IsFirstHGL);
-    void PerformStateSumThisNode(const int& is,
-                                    const int& ik,
-                                    const int& ikq,
-                                    const std::vector<double>& state_e,
-                                    const std::vector<int>& state_idx,
-                                    const WINPAIR& winpair,
-                                    const int& inode,
-                                    const bool& IsHGL,
-                                    const bool& IsFirstHGL,
-                                    const int uklpp[3]);
+    // void cubic_sigma_per_window(const int is,
+    //                                 const int ik,
+    //                                 const int iq,
+    //                                 const int ikq,
+    //                                 const WINPAIR& winpair,
+    //                                 const std::vector<double>& state_e,
+    //                                 const std::vector<int>& state_idx,
+    //                                 const std::vector<double>& pp_e,
+    //                                 const std::vector<int>& pp_idx,
+    //                                 const int uklpp[3]);
+    // void PerformPPEnergySumThisNode(const int is,
+    //                                     const int iq,
+    //                                     const std::vector<double>& pp_wp,
+    //                                     const std::vector<int>& pp_idx,
+    //                                     const WINPAIR& winpair,
+    //                                     const int inode,
+    //                                     const bool IsHGL,
+    //                                     const bool IsFirstHGL);
+    // void PerformStateSumThisNode(const int& is,
+    //                                 const int& ik,
+    //                                 const int& ikq,
+    //                                 const std::vector<double>& state_e,
+    //                                 const std::vector<int>& state_idx,
+    //                                 const WINPAIR& winpair,
+    //                                 const int& inode,
+    //                                 const bool& IsHGL,
+    //                                 const bool& IsFirstHGL,
+    //                                 const int uklpp[3]);
 
     void compute_fr(complex* fr, complex* psikq, const int uklpp[3]);
-    void sigma_cubic_main(std::complex<double>* sigma,
-                              const int& is,
-                              const int& ik,
-                              const double& w,
-                              const std::vector<std::pair<int, int>>& n12,
-                              const bool& bIsOccupied);
-    void cubicSigma(const int& is,
-                    const int& ik,
-                    const SIGMAINDICES& iwn12);
+    // void sigma_cubic_main(std::complex<double>* sigma,
+    //                           const int& is,
+    //                           const int& ik,
+    //                           const double& w,
+    //                           const std::vector<std::pair<int, int>>& n12,
+    //                           const bool& bIsOccupied);
+    // void cubicSigma(const int& is,
+    //                 const int& ik,
+    //                 const SIGMAINDICES& iwn12);
     double total_time;
 };
 

@@ -62,5 +62,6 @@ class Gpp : public CBase_Gpp {
     void recvCopy(std::vector<complex> new_data);
     void recv_eig(std::vector<double> new_data);
     void sendToCacheV(int size);
-    void sendToCacheEO(int size);
+    void sendToCacheE(int size);
+    void sendToCacheO(int size);
 };
