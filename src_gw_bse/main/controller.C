@@ -221,7 +221,8 @@ PsiCache::PsiCache() {
   tile_lock = CmiCreateLock();
 
   lp = new LAPLACE(gwbse->gw_epsilon.Eocc, gwbse->gw_epsilon.Eunocc);
-  // WIN = new WINDOWING(gwbse->gw_epsilon.Eocc, gwbse->gw_epsilon.Eunocc);
+  WIN = new WINDOWING(gwbse->gw_epsilon.Eocc, gwbse->gw_epsilon.Eunocc);
+  WIN->read_from_file();
   char fromFile[200];
   Occ_occ = new double**[1];
   Occ_unocc = new double**[1];

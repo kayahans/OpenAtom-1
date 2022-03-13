@@ -244,7 +244,7 @@ for(int ik=0;ik<gwbse->gw_parallel.K;ik++) {
               region_cidx = r_i;
               break;
             }
-          
+          // printf("%d %d %d %d\n", thisIndex.x, thisIndex.y, region_ridx, region_cidx);
           for (int iv=0; iv<this_nocc; iv++){
 
             // copy of the occupied state wavefunction as it may change due to U process
@@ -257,7 +257,7 @@ for(int ik=0;ik<gwbse->gw_parallel.K;ik++) {
               psi_occ1[i] = psi_cache->psis[ikq][Eoccidx[iv]][region_ridx*ndata+i];
               psi_occ2[i] = psi_cache->psis[ikq][Eoccidx[iv]][region_cidx*ndata+i];
             }
-
+            // printf("%d %d %d %d\n", thisIndex.x, thisIndex.y, region_ridx, region_cidx);
 #if 0
             // modify wavefunction if umklapp scattering applies
             int uklsq = uklpp[0]*uklpp[0] + uklpp[1]*uklpp[1] + uklpp[2]*uklpp[2];
@@ -404,7 +404,7 @@ void PMatrix::sigma_init(std::vector<int> _accept) {
 void PMatrix::sigma() {
   GWBSE *gwbse = GWBSE::get();
   PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
-  // WINDOWING* WIN = psi_cache->getWin();
+  WINDOWING* WIN = psi_cache->getWin();
   // WINDOWING WIN;
   // WIN->read_from_file();
   // WINDOWING* WIN;
@@ -416,11 +416,11 @@ void PMatrix::sigma() {
   double*** e_unocc = gwbse->gw_epsilon.Eunocc;
   int nkpt = gwbse->gw_parallel.K;
   int nspin = 1; // TODO (kayahans) hardcoded
-  WINDOWING WIN(e_occ, e_unocc); // = WINDOWING(gwbse->gw_epsilon.Eocc, gwbse->gw_epsilon.Eunocc);
-  WIN.read_from_file(); 
-  if (thisIndex.x == 0 && thisIndex.y ==0) {
-    WIN.printparameters();
-  }
+  // WINDOWING WIN(e_occ, e_unocc); // = WINDOWING(gwbse->gw_epsilon.Eocc, gwbse->gw_epsilon.Eunocc);
+  // WIN.read_from_file(); 
+  // if (thisIndex.x == 0 && thisIndex.y ==0) {
+  //   WIN.printparameters();
+  // }
   
   // Set up regioning data
   psi_ndata_local = config.tile_rows;
@@ -450,7 +450,7 @@ void PMatrix::sigma() {
   // sigma_index_list.push_back(n55);
   int ik = 0;
   int is = 0;
-
+  
   // 1. Loop over occ/unocc
   for (int bloop=0; bloop < 2; bloop++) {
     bool bIsOccupied;
@@ -460,6 +460,7 @@ void PMatrix::sigma() {
       bIsOccupied = false;
     
     // 2. Loop over q-points
+    // printf("Nq sigma %d\n", nq);
     for (int iq = 0; iq < nq; iq++) {
       unsigned ikq;
       int umklapp[3];
@@ -483,8 +484,7 @@ void PMatrix::sigma() {
         state_end_index   = nunocc; // opts.nstateCh;  // TODO (kayahans)
       }
       // 3. loop over window pairs
-      
-      for (WINPAIR winpair : WIN.winpairs) {
+      for (WINPAIR winpair : WIN->winpairs) {
         std::vector<double> state_e;  // E_v - w or w - E_c
         std::vector<double> pp_wp;     // PP energies w
         std::vector<int> state_idx;   // indexes of the state psi in window
@@ -667,9 +667,9 @@ void PMatrix::sigma() {
 //                 delete [] fr1;
 //               } // end A^p_{rr'}  Eq. 35 (7b)
 
-              // for (int idata = 0; idata < tile_size; idata++) {
-              //     sigma_m[idata] += iQuadFactor * F_m[idata] * B_m[idata];
-              // }
+//               for (int idata = 0; idata < tile_size; idata++) {
+//                   sigma_m[idata] += iQuadFactor * F_m[idata] * B_m[idata];
+//               }
               
               delete [] B_m;
               delete [] F_m;
@@ -679,6 +679,7 @@ void PMatrix::sigma() {
       }  // end winpair loop (3)
     }  // end iloop (2)
   } // end bloop (1)
+
 
   // Now multiply with state vectors <psi^*|Sigma|psi> to get sigma energies
   // int i = 0;

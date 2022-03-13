@@ -544,16 +544,16 @@ module controller {
       // TODO(kayahans): change here later
       when GppFormed() serial{
         // eps_matrix2D_X_proxy.bareExchange();
-        START_STEP("SIGMA INITIALIZED");
+        START_STEP("Sigma Initialized");
         pmatrix2D_proxy.sigma_init(accept_result);
       }
       when sigma_n3_initialized() serial {
-        STOP_STEP("SIGMA INITIALIZED");
-        START_STEP("SIGMA CALCULATED");
+        STOP_STEP("Sigma Initialized");
+        START_STEP("Sigma Calculated");
         pmatrix2D_proxy.sigma();
       }
       when sigma_n3_complete() serial {
-        STOP_BIG_STEP("SIGMA CALCULATED");
+        STOP_BIG_STEP("Sigma Calculated");
       }
       when bareExchangeComplete(CkReductionMsg* msg) serial {
         CkReduction::tupleElement* results = NULL;

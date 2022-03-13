@@ -27,7 +27,8 @@ class GW_SIGMA{
     
     int sigma_mode;  // 0 for static sigma calculation
                      // 1 for GPP 
-    
+    int proc_rows;
+    int proc_cols;
     char rhoFilename[200];
     complex* rhoData;
     int ndata_rho;
@@ -44,6 +45,8 @@ class GW_SIGMA{
       n_list_sig_matels = 0;
       np_list_sig_matels = 0;
       sigma_mode = 0;
+      proc_cols = 0;
+      proc_rows = 0;
       ndata_rho = 0;
       nr1 = -1;
       nr2 = -1;
@@ -63,6 +66,8 @@ class GW_SIGMA{
       p | screened_coulomb_cutoff;
       p | bare_coulomb_cutoff;
       p | sigma_mode;
+      p | proc_rows;
+      p | proc_cols;
       p | ndata_rho;
       p | nr1;
       p | nr2;
@@ -99,6 +104,8 @@ class GW_SIGMA{
       fprintf(fp,"screened_coulomb_cutoff %lg\n",screened_coulomb_cutoff);
       fprintf(fp,"bare_coulomb_cutoff %lg\n",bare_coulomb_cutoff);
       fprintf(fp,"sigma_mode %d\n",sigma_mode);
+      fprintf(fp,"proc_rows %d\n",proc_rows);
+      fprintf(fp,"proc_cols %d\n",proc_cols);
       fclose(fp);
     }// end routine
     // TODO(kayahans: add the name of tile for rho

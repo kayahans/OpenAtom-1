@@ -483,7 +483,7 @@ void Config::set_config_dict_GW_epsilon  (int *num_dict ,DICT_WORD **dict){
 void Config::set_config_dict_GW_sigma  (int *num_dict ,DICT_WORD **dict){
   //==================================================================================
   //  I) Malloc the dictionary                                              
-  num_dict[0] = 6;
+  num_dict[0] = 8;
   *dict = (DICT_WORD *)cmalloc(num_dict[0]*sizeof(DICT_WORD),"set_dict_gen_GW")-1;
 
   //=================================================================================
@@ -541,6 +541,20 @@ void Config::set_config_dict_GW_sigma  (int *num_dict ,DICT_WORD **dict){
   strcpy((*dict)[ind].keyword,"rho_file");
   strcpy((*dict)[ind].keyarg,"rho.dat");
   strcpy((*dict)[ind].error_mes,"a file containing real-space charge density");
+
+  //-----------------------------------------------------------------------------
+  //  7)\proc_rows{}
+  ind =   7;   
+  strcpy((*dict)[ind].keyword,"proc_cols");
+  strcpy((*dict)[ind].keyarg,"1");
+  strcpy((*dict)[ind].error_mes,"an integer");
+
+  //-----------------------------------------------------------------------------
+  //  8)\proc_cols{}
+  ind =   8;   
+  strcpy((*dict)[ind].keyword,"proc_rows");
+  strcpy((*dict)[ind].keyarg,"1");
+  strcpy((*dict)[ind].error_mes,"an integer");
   //-----------------------------------------------------------------------------
 }//end routine
 //===================================================================================
@@ -1092,6 +1106,20 @@ void Config::set_config_params_GW_sigma  (DICT_WORD *dict, char *fun_key, char *
   ind =   6;
   strcpy(gw_sigma->rhoFilename, dict[ind].keyarg); // must put somewhere!
   if (strlen(gw_sigma->rhoFilename) == 0){keyarg_barf(dict,input_name,fun_key,ind);}  
+
+     //-----------------------------------------------------------------------------
+  //  5)\proc_rows{}
+  ind =   7;   
+  sscanf(dict[ind].keyarg,"%d",&int_arg);
+  if (int_arg<0){keyarg_barf(dict,input_name,fun_key,ind);}
+  gw_sigma->proc_rows = int_arg; 
+
+     //-----------------------------------------------------------------------------
+  //  5)\proc_cols{}
+  ind =   8;   
+  sscanf(dict[ind].keyarg,"%d",&int_arg);
+  if (int_arg<0){keyarg_barf(dict,input_name,fun_key,ind);}
+  gw_sigma->proc_cols = int_arg; 
   //----------------------------------------------------------------------------- 
 }// end routine
 //================================================================================

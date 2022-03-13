@@ -841,9 +841,10 @@ void DiagBridge::prepareData(int qindex, int eps_size, int num_qpts) {
 
   // Proc distribution to be used for diagonalization
   GWBSE* gwbse = GWBSE::get();
+  GW_SIGMA *gw_sigma = &(gwbse->gw_sigma);
   // TODO (kayahans): read from input
-  proc_rows = 2; // gwbse->gw_parallel.proc_rows;
-  proc_cols = 2; // gwbse->gw_parallel.proc_cols;
+  proc_rows = gw_sigma->proc_rows;
+  proc_cols = gw_sigma->proc_cols;
 
   // Number of blocks
   numBlocks = eps_size / eps_rows + 1;
