@@ -14,7 +14,11 @@ void LAPLACE::initialize(double* e_occ, double* e_unocc, int nocc, int nunocc){
   minEunocc = e_unocc[0];
   maxEunocc = e_unocc[nunocc-1];
   // debugging
-  printf("Initialized value: minEocc=%f maxEocc=%f minEunocc =%f maxEunocc=%f\n",minEocc,maxEocc,minEunocc,maxEunocc);
+  int mype = CKMYPE();
+  if (mype == 0) {
+    printf("Initialized value: minEocc=%f maxEocc=%f minEunocc =%f maxEunocc=%f\n",minEocc,maxEocc,minEunocc,maxEunocc);
+  }
+  
 }
 
 // set band gap and band width
@@ -285,18 +289,20 @@ void LAPLACE::set_windows(){
 
     }// end nwc loop
   }// end nwv loop
-
-  printf("\n Reporting windowing strategy:\n");
-  printf("** number of windows for occupied states: %d, unoccupied states: %d\n", wIdxv+1, wIdxc+1);
-  
-  /*debugging  
-  printf("Ev: %lg %lg   Ec: %lg %lg\n",minEocc,maxEocc,minEunocc,maxEunocc);
-  for(int i=0;i<maxnw;i++){
-    for(int j=0;j<maxnw; j++){
-      printf("at this window (%d,%d), minimum cost is: %lg\n",i+1,j+1,MINCOST[i][j]);
-    }
+  int mype = CKMYPE();
+  if (mype == 0) {
+    printf("\n Reporting windowing strategy:\n");
+    printf("** number of windows for occupied states: %d, unoccupied states: %d\n", wIdxv+1, wIdxc+1);
   }
-  */
+  
+  // debugging  
+  // printf("Ev: %lg %lg   Ec: %lg %lg\n",minEocc,maxEocc,minEunocc,maxEunocc);
+  // for(int i=0;i<maxnw;i++){
+  //   for(int j=0;j<maxnw; j++){
+  //     printf("at this window (%d,%d), minimum cost is: %lg\n",i+1,j+1,MINCOST[i][j]);
+  //   }
+  // }
+  
   
   // now, we estimated the number of windows, and how to slice them to get the lowest computation.
   // report these values, and finish this routine
@@ -316,7 +322,7 @@ void LAPLACE::set_windows(){
   }
   // total windows
   totnw = nwocc * nwunocc;
-  printf("** total number of windows: %d\n",totnw);
+  printf("** total number of window pairs: %d\n",totnw);
 
       
 }
@@ -411,6 +417,7 @@ void LAPLACE::set_numnodes(){
 	if ( errorG < ptol &&  errorW < ptol ){
 	  Nnodes[i][j] = inode;
  	  opta[i][j] = a;
+    //  printf("Window %d %d num_nodes %d\n", i, j, inode);
 	  break;
 	}
       } // search for Nnodes ends

@@ -390,7 +390,7 @@ for(int ik=0;ik<gwbse->gw_parallel.K;ik++) {
 for(int i=0;i<ndata*ndata;i++)
   data[i] = P_m[i].conj();
 //CkPrintf("\nContrib %d,%d\n", thisIndex.x, thisIndex.y);
-  contribute(CkCallback(CkReductionTarget(Controller, newPMatrixComplete), controller_proxy));
+  // contribute(CkCallback(CkReductionTarget(Controller, newPMatrixComplete), controller_proxy)); // enable for N3 P
 }
 
 
@@ -425,14 +425,14 @@ void PMatrix::sigma() {
   // Set up regioning data
   psi_ndata_local = config.tile_rows;
   tile_size = config.tile_rows * config.tile_cols;
-  // region_ridx = 0;
+  region_ridx = 0;
   // for(int r_i=0;r_i<psi_cache->regions.size();r_i++)
   //   if(start_row == psi_cache->regions[r_i].second) {
   //     region_ridx = r_i;
   //     break;
   //   }
 
-  // region_cidx = 0;
+  region_cidx = 0;
   // for(int r_i=0;r_i<psi_cache->regions.size();r_i++)
   //   if(start_col == psi_cache->regions[r_i].second) {
   //     region_cidx = r_i;
@@ -440,16 +440,20 @@ void PMatrix::sigma() {
   //   }
   // printf("xy %d %d %d %d %d %d\n", thisIndex.x, thisIndex.y, region_ridx, region_cidx, psi_ndata_local, tile_size);
   sigma_m = new complex[tile_size]; // sigma rr' tile
-  
+  for (int idata = 0; idata < tile_size; idata++) {
+    sigma_m[idata] = 0.0;
+  }  
   // // Sigma mtxels, frequencies
-  double w = 1.000;
-  // std::vector<SIGMAINDICES> sigma_index_list;
-  // SIGMAINDICES n44(w, 4,4);
-  // SIGMAINDICES n55(w, 5,5);
-  // sigma_index_list.push_back(n44);
-  // sigma_index_list.push_back(n55);
+  double w = 0.23;
+  std::vector<SIGMAINDICES> sigma_index_list;
+  SIGMAINDICES n44(w, 4,4);
+  SIGMAINDICES n55(w, 5,5);
+  sigma_index_list.push_back(n44);
+  sigma_index_list.push_back(n55);
   int ik = 0;
   int is = 0;
+  
+
   
   // 1. Loop over occ/unocc
   for (int bloop=0; bloop < 2; bloop++) {
@@ -470,6 +474,9 @@ void PMatrix::sigma() {
       int ng = psi_cache->get_ng();
       // WIN->sigma_win(w, gpp_omsq, ng);
       // WIN->searchwins("Sigma"); // on the fly windowing optimization
+      if (thisIndex.x == 0 && thisIndex.y == 0) {
+        WIN->printparameters();
+      }      
       // printf("xy %d %d %f %f %f %f\n", thisIndex.x, thisIndex.y, gpp_eig[0], gpp_eig[130], gpp_omsq[0], gpp_omsq[130]);
       std::vector<double> psi_eig;// shifted state eigenvalues
       double* _eig_occ = e_occ[is][ikq];
@@ -521,6 +528,7 @@ void PMatrix::sigma() {
             wpsq = gpp_omsq[ipp];
             wp = sqrt(wpsq);
             // Select w2>0 windows only!
+            // printf("ipp %d wp %f \n", ipp, wp);
             if (wpsq > 0.0) {
               if (winpair.in_window(wp, window_index, sigma_window_index)) {
                 pp_wp.push_back(wp);
@@ -544,6 +552,9 @@ void PMatrix::sigma() {
         //  PerformPPEnergySumThisNode
         //  PerformStateSumThisNode
         // we use zeta = - winpair.zeta;
+        if (thisIndex.x == 0 && thisIndex.y==0) {
+          printf("Window %f %f %f %f %d %d %d %d \n", winpair.w1[0], winpair.w1[1], winpair.w2[0], winpair.w2[1], winpair.nodes.size(), state_e.size(), pp_wp.size(), ipp);
+        }
         
         // 4. If any states/PP are in this window pair
         if (state_e.size() > 0 && pp_wp.size() > 0) {
@@ -627,49 +638,50 @@ void PMatrix::sigma() {
               // A_{r,r'} Eq. 35
               // PerformStateSumThisNode(is, ik, ikq, state_e, state_idx, winpair, inode, bIsHGL, bIsFirstLoop, uklpp);
               // 7b. Loop over state energies in window pair
-//               for (int i = 0; i < Na; i++) {
-//                 complex* psiRkq_i = new complex[psi_ndata_local];
-//                 complex *fr1 = new complex[psi_ndata_local]; //rho-bar matrix
-//                 for (int idx=0; idx<psi_ndata_local; idx++){
-//                   psiRkq_i[idx] = psi_cache->psis[ikq][state_idx[i]][region_ridx*psi_ndata_local+idx];
-//                   fr1[idx] = psiRkq_i[idx];
-//                 }
-//                 // TODO later
-//                 // Need to modify psikq if umklapp vector is not zero
-//                 // if( uklpp[0]!=0 || uklpp[1]!=0 || uklpp[2]!=0 ){
-//                 //   complex* psikq_tmp[tile_size];
-//                 //   // TODO modify_state_Uproc(fr, uklpp, nfft, sys);
-//                 // }
+              for (int i_s = 0; i_s < Na; i_s++) {
+                complex* psiRkq_i = new complex[psi_ndata_local];
+                complex *fr1 = new complex[psi_ndata_local]; //rho-bar matrix
+                for (int idx=0; idx<psi_ndata_local; idx++){
+                  psiRkq_i[idx] = psi_cache->psis[ikq][state_idx[i_s]][region_ridx*psi_ndata_local+idx];
+                  fr1[idx] = psi_cache->psis[ikq][state_idx[i_s]][region_ridx*psi_ndata_local+idx];
+                }
+                
+                // TODO later
+                // Need to modify psikq if umklapp vector is not zero
+                // if( uklpp[0]!=0 || uklpp[1]!=0 || uklpp[2]!=0 ){
+                //   complex* psikq_tmp[tile_size];
+                //   // TODO modify_state_Uproc(fr, uklpp, nfft, sys);
+                // }
 
-//                 double factor;
-//                 if (!bIsHGL) {
-//                   factor = exp(-zeta * (state_emax - state_e[i])*tau_u);
-//                   // factor = exp(-zeta * (state_emax - state_e[i])*tau_u);
-//                 } else {  // HGL
-//                   if (bIsFirstLoop) {
-//                     factor = cos(tau_u*state_e[i]*gamma);
-//                   } else {
-//                     factor = sin(tau_u*state_e[i]*gamma);
-//                   }
-//                 }
-//                 // printf("i: %d, inode: %d, State factor: %lf, tau_u: %lf, zeta %lf\n", i, inode, factor, tau_u, zeta);
-//                 // LAPACK
-//                 char transformT = 'C';
-//                 char transform  = 'N';
-//                 int Lone        = 1;
-//                 double beta    = 1.0;
-// #ifdef USE_LAPACK
-//                 myGEMM(&transform, &transformT, &psi_ndata_local, &psi_ndata_local, &Lone,  &factor, fr1, &psi_ndata_local, fr1, &psi_ndata_local, &beta, F_m, &psi_ndata_local);
-// #else
-//                 Die("Without -DUSE_LAPACK flag, polarizability calculation does not work!");
-// #endif    
-//                 delete [] psiRkq_i;
-//                 delete [] fr1;
-//               } // end A^p_{rr'}  Eq. 35 (7b)
+                double factor;
+                if (!bIsHGL) {
+                  factor = exp(-zeta * (state_emax - state_e[i_s])*tau_u);
+                  // factor = exp(-zeta * (state_emax - state_e[i])*tau_u);
+                } else {  // HGL
+                  if (bIsFirstLoop) {
+                    factor = cos(tau_u*state_e[i_s]*gamma);
+                  } else {
+                    factor = sin(tau_u*state_e[i_s]*gamma);
+                  }
+                }
+                // printf("i: %d, inode: %d, State factor: %lf, tau_u: %lf, zeta %lf\n", i, inode, factor, tau_u, zeta);
+                // LAPACK
+                char transformT = 'C';
+                char transform  = 'N';
+                int Lone        = 1;
+                double beta    = 1.0;
+#ifdef USE_LAPACK
+                myGEMM(&transform, &transformT, &psi_ndata_local, &psi_ndata_local, &Lone,  &factor, fr1, &psi_ndata_local, fr1, &psi_ndata_local, &beta, F_m, &psi_ndata_local);
+#else
+                Die("Without -DUSE_LAPACK flag, polarizability calculation does not work!");
+#endif    
+                // delete [] psiRkq_i;
+                delete [] fr1;
+              } // end A^p_{rr'}  Eq. 35 (7b)
 
-//               for (int idata = 0; idata < tile_size; idata++) {
-//                   sigma_m[idata] += iQuadFactor * F_m[idata] * B_m[idata];
-//               }
+              // for (int idata = 0; idata < tile_size; idata++) {
+              //     sigma_m[idata] += iQuadFactor * F_m[idata] * B_m[idata];
+              // }
               
               delete [] B_m;
               delete [] F_m;
@@ -682,28 +694,28 @@ void PMatrix::sigma() {
 
 
   // Now multiply with state vectors <psi^*|Sigma|psi> to get sigma energies
-  // int i = 0;
-  // for (SIGMAINDICES iwn12 : sigma_index_list) {
-  //   for (std::pair<int, int> in12 : iwn12.n12) {
-  //     complex psiRk_n1[psi_ndata_local];
-  //     complex psiRk_n2[psi_ndata_local];
-  //     for (int i=0; i<psi_ndata_local; i++){
-  //       psiRk_n1[i] = psi_cache->psis[ik][in12.first][region_ridx*psi_ndata_local + i];
-  //       psiRk_n2[i] = psi_cache->psis[ik][in12.second][region_cidx*psi_ndata_local + i];
-  //     }
-  //     char transformT = 'C';
-  //     char transform  = 'N';
-  //     int    Lone   = 1;
-  //     double beta   = 0.0;
-  //     double factor = 1.0;
-  //     complex sigma_n2[tile_size] = {0.0};
-  //     complex n1_sigma_n2[1]  = {0.0};
-  //     myGEMM(&transform,  &transform, &psi_ndata_local, &Lone, &psi_ndata_local, &factor, sigma_m, &psi_ndata_local, psiRk_n2, &psi_ndata_local, &beta, sigma_n2, &psi_ndata_local);
-  //     myGEMM(&transformT, &transform, &Lone,  &Lone, &psi_ndata_local, &factor, psiRk_n1, &psi_ndata_local, sigma_n2, &psi_ndata_local, &beta, n1_sigma_n2, &Lone);
-  //     sigma_m[i] = n1_sigma_n2[0].re;
-  //     i++;
-  //   }
-  // }
+  int i = 0;
+  for (SIGMAINDICES iwn12 : sigma_index_list) {
+    for (std::pair<int, int> in12 : iwn12.n12) {
+      complex psiRk_n1[psi_ndata_local];
+      complex psiRk_n2[psi_ndata_local];
+      for (int i=0; i<psi_ndata_local; i++){
+        psiRk_n1[i] = psi_cache->psis[ik][in12.first][region_ridx*psi_ndata_local + i];
+        psiRk_n2[i] = psi_cache->psis[ik][in12.second][region_cidx*psi_ndata_local + i];
+      }
+      char transformT = 'C';
+      char transform  = 'N';
+      int    Lone   = 1;
+      double beta   = 0.0;
+      double factor = 1.0;
+      complex sigma_n2[tile_size] = {0.0};
+      complex n1_sigma_n2[1]  = {0.0};
+      myGEMM(&transform,  &transform, &psi_ndata_local, &Lone, &psi_ndata_local, &factor, sigma_m, &psi_ndata_local, psiRk_n2, &psi_ndata_local, &beta, sigma_n2, &psi_ndata_local);
+      myGEMM(&transformT, &transform, &Lone,  &Lone, &psi_ndata_local, &factor, psiRk_n1, &psi_ndata_local, sigma_n2, &psi_ndata_local, &beta, n1_sigma_n2, &Lone);
+      sigma_m[i] = n1_sigma_n2[0].re;
+      i++;
+    }
+  }
   contribute(CkCallback(CkReductionTarget(Controller, sigma_n3_complete), controller_proxy));
 }
 

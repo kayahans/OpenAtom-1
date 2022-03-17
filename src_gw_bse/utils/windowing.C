@@ -458,6 +458,7 @@ void WINDOWING::printparameters() const {
     printf("\tErrfrac : %f (equal to ptol = %f)\n", errfrac, ptol);
     printf("\tMinimum gap: %f Ha \n", min_gap);
     printf("\tMax valence and conduction windows : (%d, %d) \n", max_windows[0], max_windows[1]);
+    printf("\t w1_d     w1_u     w2_d     w2_u     n ns nb ng\n");
 }
 
 void WINDOWING::searchwins(char* _option) {

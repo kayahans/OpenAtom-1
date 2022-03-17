@@ -334,32 +334,36 @@ void PsiCache::receivePsi(PsiMessage* msg) {
   if (msg->spin_index != 0) {
     CkAbort("Error: We don't support multiple spins yet!\n");
   }
+  bool n3 = false;
   CkAssert(msg->k_index < K);
-  // CkAssert(msg->state_index < L);
   CkAssert(msg->size == psi_size);
-  if(msg->shifted==false){std::copy(msg->psi, msg->psi+psi_size, psis[msg->k_index][msg->state_index]);}
-    if(msg->shifted==true){std::copy(msg->psi, msg->psi+psi_size, psis[msg->k_index][msg->state_index]);}
-  fflush(stdout);
-  states_received++;
-  // printf("recv %d target %d\n", states_received, (L+M)*K);
-#if 1
-  if(states_received == (L+M)*K) {
-  
-  // if(msg->shifted==true){std::copy(msg->psi, msg->psi+psi_size, psis_shifted[msg->k_index][msg->state_index]);}
-  // delete msg;
+  if (n3) {
+    if(msg->shifted==false){std::copy(msg->psi, msg->psi+psi_size, psis[msg->k_index][msg->state_index]);}
+      if(msg->shifted==true){std::copy(msg->psi, msg->psi+psi_size, psis[msg->k_index][msg->state_index]);}
+    fflush(stdout);
+    states_received++;
+    // printf("recv %d target %d\n", states_received, (L+M)*K);
+    if(states_received == (L+M)*K) {
+      contribute(CkCallback(CkReductionTarget(Controller,cachesFilled), controller_proxy));
+      delete msg;
+    }
+  } else {
+    CkAssert(msg->state_index < L);
+    
+    if(msg->shifted==false){std::copy(msg->psi, msg->psi+psi_size, psis[msg->k_index][msg->state_index]);}
+    if(msg->shifted==true){std::copy(msg->psi, msg->psi+psi_size, psis_shifted[msg->k_index][msg->state_index]);}
+    delete msg;
 
-  // // Once the cache has received all of it's data start the sliding pipeline
-  // // sending of psis to P to start the accumulation of fxf'.
-  // int expected_psis = K*L;
-  // if(qindex == 0)
-  //   expected_psis += K*L;
-  // if (++received_psis == expected_psis) {
-  //   received_psis = 0;
-  //   //CkPrintf("[%d]: Cache filled\n", CkMyPe());
-    contribute(CkCallback(CkReductionTarget(Controller,cachesFilled), controller_proxy));
-#endif
-
-  delete msg;    
+    // Once the cache has received all of it's data start the sliding pipeline
+    // sending of psis to P to start the accumulation of fxf'.
+    int expected_psis = K*L;
+    if(qindex == 0)
+      expected_psis += K*L;
+    if (++received_psis == expected_psis) {
+      received_psis = 0;
+      //CkPrintf("[%d]: Cache filled\n", CkMyPe());
+      contribute(CkCallback(CkReductionTarget(Controller,cachesFilled), controller_proxy));
+    }
   }
 }
 
@@ -805,7 +809,7 @@ void PsiCache::init_gpp_cache() {
       gpp_eigv[iq][ia] = new complex [ng];
     }
   }
-  printf("PsiCache GPP ready numq %d num_alpha %d ng %d\n", num_q, num_alpha, ng);
+  // printf("PsiCache GPP ready numq %d num_alpha %d ng %d\n", num_q, num_alpha, ng);
   contribute(CkCallback(CkReductionTarget(Controller,gpp_psi_cache_ready), controller_proxy));
 }
 

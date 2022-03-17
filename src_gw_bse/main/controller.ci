@@ -94,7 +94,7 @@ module controller {
     entry [reductiontarget] void readComplete(bool success);
     entry [reductiontarget] void writeComplete(bool success);
     entry [reductiontarget] void verifyComplete(bool success);
-    entry [reductiontarget] void newPMatrixComplete();
+    // entry [reductiontarget] void newPMatrixComplete();
     entry void gpp_M1_complete();
     entry void gpp_M2_complete();    
     entry void PMatrixFormed();
@@ -150,99 +150,68 @@ module controller {
         
         states_proxy.fftGtoR(qindex);
       }
-      when fftComplete() serial {
-        #ifdef REGISTER_REGIONS
-        pmatrix2D_proxy.registerTileSections();
-        #endif
-#if 1        
-        for (next_K = 0; next_K < K; next_K++) {
-          for (next_state = 0; next_state < L+M; next_state++) {
-            states_proxy(0, next_K, next_state).sendToCache();
-            fflush(stdout);
-          }
-        }
-#endif
-// #if 1
-//         for (next_K = 0; next_K < K; next_K++) {
-//           for (next_state = L; next_state < L+M; next_state++) {
-//             states_proxy(0, next_K, next_state).sendToCache();
+//       if (p_config.n3) {
+//         // N3 method
+//         when fftComplete() serial {
+// #ifdef REGISTER_REGIONS
+//           pmatrix2D_proxy.registerTileSections();
+// #endif
+//           for (next_K = 0; next_K < K; next_K++) {
+//             for (next_state = 0; next_state < L+M; next_state++) {
+//               states_proxy(0, next_K, next_state).sendToCache();
+//               fflush(stdout);
+//             }
 //           }
 //         }
-// #endif
-      }
-      // when fCacheReady(), cachesFilled(), registrationComplete() serial {
-      //   psi_cache_proxy.reportInfo();
-      //   STOP_BIG_STEP("SETUP COMPLETED");
-      // }
-      serial {
-        START_STEP("P MATRIX FORMED");
-      }
-      when cachesFilled() serial {
-        pmatrix2D_proxy.computeP();
-      }
+//         serial {
+//           START_STEP("P MATRIX FORMED");
+//         }
+//         when cachesFilled() serial {
+//           pmatrix2D_proxy.computeP();
+//         }
+//         when newPMatrixComplete() serial {
+//           CkPrintf("\nDone n^3 method"); fflush(stdout);
+//           matrixCopy(pmatrix2D_proxy, pmatrix1D_proxy, copyCB);
+//         }
+//         when copyComplete(bool success) serial{
+//           CkPrintf("\nCopy complete\n"); fflush(stdout);
+//           STOP_BIG_STEP("P MATRIX FORMED");
+//           thisProxy.PMatrixFormed();
+//         }
+        // when fCacheReady(), registrationComplete() serial {
+        //     psi_cache_proxy.reportInfo();
+        //     STOP_BIG_STEP("SETUP COMPLETED");
+        // }
+//       } else {
+      // N4 method
+        when fftComplete() serial {
+#ifdef REGISTER_REGIONS
+          pmatrix2D_proxy.registerTileSections();
+#endif
+          for (next_K = 0; next_K < K; next_K++) {
+            for (next_state = 0; next_state < L; next_state++) {
+              states_proxy(0, next_K, next_state).sendToCache();
+            }
+          }
+        }
+        when fCacheReady(), cachesFilled(), registrationComplete() serial {
+          psi_cache_proxy.reportInfo();
+          STOP_BIG_STEP("SETUP COMPLETED");
+        }
+        serial {
+          if (!p_config.read) {
+            thisProxy.formPMatrix();
+          } else {
+            CkPrintf("[CONTROLLER] Reading P Matrix from files %s...\n",
+                p_config.read_prefix.c_str());
+            matrixRead(pmatrix1D_proxy, p_config.read_prefix, readCB);
+            START_STEP("P MATRIX READ FROM FILE");
+          }
+        }
 
-      when newPMatrixComplete() serial {
-        CkPrintf("\nDone n^3 method"); fflush(stdout);
-//        CkExit(0);
-        matrixCopy(pmatrix2D_proxy, pmatrix1D_proxy, copyCB);
-      }
-
-      when copyComplete(bool success) serial{
-        CkPrintf("\nCopy complete\n"); fflush(stdout);
-/*
-        START_STEP("1st FFT completed");
-        pmatrix1D_proxy.fftRows(1);
-      }
-
-      // The FFT of the rows is complete, so now transpose the matrix.
-      when fftComplete() serial{
-        STOP_STEP("1st FFT completed");
-        START_STEP("1st Transpose completed");
-        pmatrix1D_proxy.start_iteration();
-        pmatrix1D_proxy.doTranspose();
-      }
-
-      // Transpose is complete, so FFT the rows again in the opposite direction.
-      when transposeComplete() serial{
-        STOP_STEP("1st Transpose completed");
-        START_STEP("2nd FFT completed");
-        pmatrix1D_proxy.fftRows(-1);
-      }
-
-      // The second FFT is complete, so transpose back.
-      when fftComplete() serial{
-        STOP_STEP("2nd FFT completed");
-        START_STEP("2nd Transpose completed");
-        pmatrix1D_proxy.start_iteration();
-        pmatrix1D_proxy.doTranspose();
-      }
-      // The final transpose is complete so now switch back to the 2D decomp.
-      when transposeComplete() serial{
-        STOP_STEP("2nd Transpose completed");
-        STOP_STEP("P Matrix formed in G space");
-*/
-        STOP_BIG_STEP("P MATRIX FORMED");
-        thisProxy.PMatrixFormed();
-      }      
-//        thisProxy.PMatrixFormed();
-//        CkExit(0);
-//      }      
       /************************************************************************/
       /** Phase 1: Form the P Matrix ******************************************/
       /************************************************************************/
-      // serial {
-#if 0
-      when newPMatrixComplete() serial {        
-        if (!p_config.read) {
-          thisProxy.formPMatrix();
-        } else {
-          CkPrintf("[CONTROLLER] Reading P Matrix from files %s...\n",
-              p_config.read_prefix.c_str());
-          matrixRead(pmatrix1D_proxy, p_config.read_prefix, readCB);
-          START_STEP("P MATRIX READ FROM FILE");
-        }
-      }
-#endif      
       case {
         when PMatrixFormed() {
           if (p_config.write || p_config.verify) {
@@ -289,10 +258,7 @@ module controller {
           }
         }
       }
-    when fCacheReady(), registrationComplete() serial {
-        psi_cache_proxy.reportInfo();
-        STOP_BIG_STEP("SETUP COMPLETED");
-      }
+
       /************************************************************************/
       /** Phase 2: Form the Epsilon Matrix ************************************/
       /************************************************************************/
@@ -345,8 +311,6 @@ module controller {
           gpp2D_M1_proxy = CProxy_EpsMatrix::ckNew(
             cfg2D, opts);
         }
-        
-        
         eps_matrix1D_proxy = CProxy_EpsMatrix::ckNew(
             cfg1D, cfg1D.chareRows(), cfg1D.chareCols());
         
@@ -685,36 +649,42 @@ module controller {
 
     entry void formGpp() {
       // Print S-matrix to verify (start)
-      serial {
-        matrixCopy(s_matrix2D_proxy, s_matrix1D_proxy, copyCB);
-      }
-      when copyComplete(bool success) {}
-      serial {
-        std::string filename = "data/Smatrix_q" + std::to_string(qindex);
-        matrixWrite(s_matrix1D_proxy, filename, writeCB);
-      }
+      // serial {
+      //   matrixCopy(s_matrix2D_proxy, s_matrix1D_proxy, copyCB);
+      // }
+      // when copyComplete(bool success) {}
+      // serial {
+      //   std::string filename = "data/Smatrix_q" + std::to_string(qindex);
+      //   matrixWrite(s_matrix1D_proxy, filename, writeCB);
+      // }
       // Print S-matrix to verify (end)
       serial {
         START_STEP("GPP FORMED");
-        START_STEP("Store S Matrix");
+        // START_STEP("Store S Matrix");
         // CkPrintf("[CONTROLLER] Transfer Eps to Gpp\n");
         matrixCopy(s_matrix2D_proxy, sdiag_matrix2D_proxy, copyCB);
       }
-      when copyComplete(bool success) serial{ 
-        STOP_STEP("Store S Matrix");
+
+      // HERE below are for S matrix 
+      when copyComplete(bool success) serial{
+        sdiag_matrix2D_proxy.print(qindex, 0);  // Print eigenvectors of S to EPS_0 before reading
+        std::string filename = "data/S_q" + std::to_string(qindex);
+        matrixRead(eps_matrix1D_proxy, filename, readCB);
+      }
+      when readComplete(bool success) serial { 
+        matrixCopy(eps_matrix1D_proxy, sdiag_matrix2D_proxy, copyCB);
+      }
+      when copyComplete(bool success) serial {
+        sdiag_matrix2D_proxy.print(qindex, 1); // Print eigenvectors of S to EPS_1 after reading
+      // Here ABOVE are for S matrix
+
+        // STOP_STEP("Store S Matrix");
         START_STEP("Prepare S matrix to MPI transfer");
         diag_bridge_proxy.prepareData(qindex, real_epsilon_size, qpts);
       }
       when diag_setup() serial {
         STOP_STEP("Prepare S matrix to MPI transfer");
         START_STEP("Transfer S to MPI");
-      //   std::string filename = "data/Wilkinson_" + std::to_string(qindex);
-      //   matrixRead(eps_matrix1D_proxy, filename, readCB);
-      // }
-      // when readComplete(bool success) serial { 
-      //   matrixCopy(eps_matrix1D_proxy, sdiag_matrix2D_proxy, copyCB);
-      // }
-      // when copyComplete(bool success) serial {
         diag_bridge_proxy.copyToMPI(qindex, real_epsilon_size, sdiag_matrix2D_proxy);
       }
       when mpi_copy_complete() serial {
@@ -734,6 +704,7 @@ module controller {
         STOP_STEP("Transfer S from MPI")
         START_STEP("S Transpose")
         sdiag_matrix2D_proxy.createTranspose(sdiagT_matrix2D_proxy, false);
+        
       }
       when transpose_complete() serial {
         STOP_STEP("S Transpose")
@@ -753,41 +724,22 @@ module controller {
       when gpp_M0_complete() serial {
         STOP_STEP("GPP prepare M0")
         START_STEP("GPP M1 = M0 * V^T Step 1/2")
-        sdiag_matrix2D_proxy.print(qindex, 0);
-      //   std::string filename = "output/SDIAG_q" + std::to_string(qindex);
-      //   matrixWrite(sdiag_matrix2D_proxy, filename, writeCB);
-      // }
-      // when writeComplete(bool success) serial { 
         gpp2D_M0_proxy.transferFromGpp(gpp2D_proxy, false);
-        // matrixCopy(gpp2D_proxy, gpp2D_M0_proxy, copyCB);
       }
-      // when copyComplete(bool success) serial{ 
       when transferfromGpp_complete() serial{
-        gpp2D_proxy.print(qindex, 1); // Print to GPP_1 files
-        // std::string filename = "output/GPP_M0_q" + std::to_string(qindex);
-        // matrixWrite(gpp2D_M0_proxy, filename, writeCB);
-      // }
-      // when writeComplete(bool success) serial {              
+        gpp2D_proxy.print(qindex, 1); // Print M0 to GPP_1 files
+        gpp2D_M0_proxy.print(qindex, 2); // Print M0 to EPS_2 files
         gpp2D_M0_proxy.createTranspose(gpp2D_T_M0_proxy, false);
       }
       when transpose_complete() serial {
       //   //Mggp*V^T = C
-        gpp2D_M0_proxy.print(qindex, 2);
-        // gpp2D_T_M0_proxy.print(3);
         mat_mul_proxy.do_multiply(gpp2D_M0_proxy, sdiag_matrix2D_proxy, gpp2D_M1_proxy, 1.0);
       }
       when m_multiplied() serial {
         STOP_STEP("GPP M1 = M0 * V^T Step 1/2")
-        // EPS_3 file
-        gpp2D_M1_proxy.print(qindex, 4);
+        gpp2D_M1_proxy.print(qindex, 3); // Print M0 mul1 to EPS_3
         thisProxy.gpp_M1_complete();
-        // matrixCopy(gpp2D_M0_proxy, eps_matrix1D_proxy, copyCB);
       }
-      // when copyComplete(bool success) serial {
-      //   std::string filename = "output/GPP_M0_q" + std::to_string(qindex);
-      //   matrixWrite(eps_matrix1D_proxy, filename, writeCB);
-      // }
-      // when writeComplete(bool success) serial {}
       when gpp_M1_complete() {
         serial {
           START_STEP("GPP M = V^H * M1 Step 2/2")
@@ -796,12 +748,25 @@ module controller {
         when conjugateComplete() serial {
           //V^H*Mggp = C
           // sdiagH_matrix2D_proxy.print(5);
-          mat_mul_proxy.do_multiply(sdiag_matrix2D_proxy, gpp2D_M1_proxy, gpp2D_M0_proxy, 1.0);
+          mat_mul_proxy.do_multiply(sdiagH_matrix2D_proxy, gpp2D_M1_proxy, gpp2D_M0_proxy, 1.0);
         }
         when m_multiplied() serial {
           STOP_STEP("GPP M = V^H * M1 Step 2/2")
           // Print to EPS_2 files
-          // gpp2D_M0_proxy.print(6); 
+          gpp2D_M0_proxy.print(qindex, 4); // Print M0 mul2 to EPS_4
+
+          // Here below is for multiplied MGGP
+          std::string filename = "data/Serial_Mggp2_q" + std::to_string(qindex);
+          matrixRead(eps_matrix1D_proxy, filename, readCB);
+      }
+      when readComplete(bool success) serial { 
+        matrixCopy(eps_matrix1D_proxy, gpp2D_M0_proxy, copyCB);
+      }
+      when copyComplete(bool success) serial {
+        gpp2D_M0_proxy.print(qindex, 5); // Print M0 mul2 to EPS_5
+        // Here above is for multiplied MGGP
+        // When S and multiplied MGGP are read from serial, the code works as expected (correct eigenval and correct MGGP)
+
           thisProxy.gpp_M2_complete();
         }
       }
@@ -952,7 +917,7 @@ module controller {
       // When we receive this message, we know that P has switched to a 1D
       // decomposition, so tell it to FFT all of it's rows.
       when copyComplete(bool success) serial{
-/*        START_STEP("1st FFT completed");
+        START_STEP("1st FFT completed");
         pmatrix1D_proxy.fftRows(1);
       }
 
@@ -975,7 +940,6 @@ module controller {
       when fftComplete() serial{
         STOP_STEP("2nd FFT completed");
         START_STEP("2nd Transpose completed");
-*/
         pmatrix1D_proxy.start_iteration();
         pmatrix1D_proxy.doTranspose();
       }

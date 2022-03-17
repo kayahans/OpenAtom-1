@@ -45,7 +45,7 @@ extern diagData_t* diagData;
 
 
 int main(int argc, char **argv){
-  printf("\nCalling MPI code\n");
+  // printf("\nCalling MPI code\n");
 
   // MPI parameters
   int peid, numpes;

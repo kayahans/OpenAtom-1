@@ -13,7 +13,7 @@
 #define _GW_IO_
 
 struct IOConfig {
-  bool read, write, verify;
+  bool read, write, verify, n3;
   std::string read_prefix, write_prefix, verify_prefix;
   void clear() {
     read = write = verify = false;
@@ -23,6 +23,7 @@ struct IOConfig {
     p | read;
     p | write;
     p | verify;
+    p | n3;
     p | read_prefix;
     p | write_prefix;
     p | verify_prefix;

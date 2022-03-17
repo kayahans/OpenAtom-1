@@ -691,7 +691,7 @@ void Config::set_config_dict_GW_io  (int *num_dict ,DICT_WORD **dict){
   //==================================================================================
   //  I) Malloc the dictionary                                              
 
-  num_dict[0] = 18;
+  num_dict[0] = 19;
   *dict = (DICT_WORD *)cmalloc(num_dict[0]*sizeof(DICT_WORD),"set_dict_gen_GW")-1;
 
   //=================================================================================
@@ -848,6 +848,11 @@ void Config::set_config_dict_GW_io  (int *num_dict ,DICT_WORD **dict){
   strcpy((*dict)[ind].error_mes,"a string");
   //----------------------------------------------------------------------------- 
 
+  ind =   19;
+  strcpy((*dict)[ind].keyword,"p_matrix_n3");
+  strcpy((*dict)[ind].keyarg,"off");
+  strcpy((*dict)[ind].error_mes,"on or off");
+  //----------------------------------------------------------------------------- 
 }//end routine
 //===================================================================================
 
@@ -1344,6 +1349,12 @@ void Config::set_config_params_GW_io  (DICT_WORD *dict, char *fun_key, char *inp
   ind =   18;   
   gw_io->epsilon_inv.verify_prefix = dict[ind].keyarg;
   if (strlen(gw_io->epsilon_inv.verify_prefix.c_str()) == 0){keyarg_barf(dict,input_name,fun_key,ind);}  
+  //-----------------------------------------------------------------------------
+  //  18)\p_matrix_n3{}
+  ind =   19;   
+  parse_on_off(dict[ind].keyarg,&int_arg,&ierr);
+  if (ierr==1){keyarg_barf(dict,input_name,fun_key,ind);}
+  gw_io->p_matrix.n3 = (int_arg==1?true:false);  //if int_arg ==1, then true 
 
 }// end routine
 //================================================================================

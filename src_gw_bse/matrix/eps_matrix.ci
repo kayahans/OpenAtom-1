@@ -203,27 +203,35 @@ group DiagBridge{
             
             for (int i = 0; i < num_loc_rows; i++) { 
               for (int j = 0; j < num_loc_cols; j++) { 
-                bl_cyclic_index = start_index + (j * dd_row_size) + i;
+                bl_cyclic_index = start_index + (j * dd_row_size) + i;  // this before
                 msg->data[IDX_eps(i,j)].re = diagData->eig_v[bl_cyclic_index].real();
                 msg->data[IDX_eps(i,j)].im = diagData->eig_v[bl_cyclic_index].imag();
+                
+                // bl_cyclic_index = start_index + (i * dd_col_size) + j;
+                // msg->data[IDX_eps(i,j)].re = diagData->eig_v[bl_cyclic_index].real();
+                // msg->data[IDX_eps(i,j)].im = diagData->eig_v[bl_cyclic_index].imag();
+
                 // msg->data[j*num_loc_rows + i].re = diagData->eig_v[bl_cyclic_index].real();
                 // msg->data[j*num_loc_rows + i].im = diagData->eig_v[bl_cyclic_index].imag();
                 // msg->data[i*num_loc_cols + j].re = diagData->eig_v[bl_cyclic_index].real();
                 // msg->data[i*num_loc_cols + j].im = diagData->eig_v[bl_cyclic_index].imag();
                 int global_row = glob_start_row + i;
                 int global_col = glob_start_col + j;
-              //   if (eps_row_idx == 0 && eps_col_idx == ) {
-              //   CkPrintf("[CopyFrom] diag-pe %d (%dx%d) inputsize %d (%dx%d) local_r/c %d %d bl %d r/c %d %d global_rc %d %d val %.8e\n", 
+              //   if (eps_row_idx == 1 && eps_col_idx == 1) {
+              //   CkPrintf("[CopyFrom] diag-pe %d (%dx%d) inputsize %d (%dx%d) local_r/c %d %d bl %d r/c %d %d idx %d global_rc %d %d val %.8e\n", 
               //                            mype, pe_row, pe_col, 
               //                            totaldata, row_size, col_size, 
               //                            idx_row, idx_col, 
               //                            bl_cyclic_index, 
               //                            i, j, 
+              //                            IDX_eps(i,j),
               //                            global_row, global_col,
               //                            diagData->eig_v[bl_cyclic_index].real());
               // }
-                // msg->eigenvalues[j].re = diagData->eig_e[glob_start_col+j].real();
-                msg->eigenvalues[i] = diagData->eig_e[glob_start_row+i];
+                // msg->eigenvalues[j] = diagData->eig_e[glob_start_col+j];
+                
+                msg->eigenvalues[i] = diagData->eig_e[glob_start_row+i]; // this before
+                
                 // msg->eigenvalues[j].im = diagData->eig_e[glob_start_col+j].imag();
                 // CkPrintf("Eig %d %f %f\n",i, diagData->eig_e[glob_start_col+j].real(), diagData->eig_e[glob_start_col+j].imag() );
                 // if (mype == 0 && j == 0)

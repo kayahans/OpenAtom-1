@@ -165,11 +165,11 @@ void Gpp::recvCopy(std::vector<complex> new_data) {
 
 void Gpp::recv_eig(std::vector<double> new_data) {
   int x = thisIndex.x;
-  int col = x * eps_rows;
+  int start_col = x * eps_rows;
   eigval = new double[eps_rows];
   for(int i=0;i<eps_rows;i++) {
-    eigval[i] = new_data[i+col];
-    // printf("eig %d %f\n", i+col, eigval[i]);
+    eigval[i] = new_data[i+start_col];
+    // printf("eig %d %.8e\n", i+start_col, eigval[i]);
   }
 }
 
@@ -381,16 +381,16 @@ void Gpp::calc_M0() {
 
 
 void Gpp::calc_omsq() {
-  // if (thisIndex.x == thisIndex.y) {
+  if (thisIndex.x == thisIndex.y) {
     int start_index = thisIndex.x * eps_cols;
     int end_index = (thisIndex.x + 1) * eps_cols;
     end_index = ( end_index < ng) ? end_index : ng;
     for (int i = 0; i < end_index-start_index; i++ ) {
-      // omsq[i] = data[IDX_eps(i, i)].re * factor / eigval[i];
-      omsq[i] = i+start_index;
-      // printf("i %d omsq %f %f factor %f data %f\n", i , omsq[i], eigval[i], factor, data[IDX_eps(i, i)].re);
+      omsq[i] = data[IDX_eps(i, i)].re * factor / eigval[i];
+      // omsq[i] = i+start_index;
+      printf("i %d omsq %f %.8e factor %f data %f\n", i+start_index , omsq[i], eigval[i], factor, data[IDX_eps(i, i)].re);
     }
-  // }
+  }
   contribute(CkCallback(CkReductionTarget(Controller, gpp_omsq_complete), controller_proxy));
 }
 

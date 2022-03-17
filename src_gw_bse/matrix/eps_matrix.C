@@ -735,14 +735,18 @@ DiagMessage* EpsMatrix::sendDataSimple(DiagMessage* msg) {
   for (int r = 0; r < config.tile_rows ; r++) {
     for (int c = 0; c < config.tile_cols; c++) {
       // global_index = c*config.tile_rows + r;
+          // if (x==1 && y == 1) {
+          //   printf("rc %d %d i %d %f\n", r, c, i, msg->data[i].re);
+          // }
+
         if (r < msg_rows && c < msg_cols) {
           // data[global_index] = msg->data[i];
-          data[IDX_eps(r,c)] = msg->data[i];
+          data[IDX_eps(r,c)] = msg->data[IDX_eps(r,c)];
           // data[r*config.tile_cols + c] = msg->data[c*msg_rows + r];
           i++;
         }
         else {
-          data[global_index] = 0.0;
+          data[IDX_eps(r,c)] = 0.0;
           // data[c*config.tile_rows + r] = msg->data[i];
         }
         // global_row = x*config.tile_rows + r;
