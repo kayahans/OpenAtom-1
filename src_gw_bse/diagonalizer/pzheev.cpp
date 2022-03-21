@@ -91,9 +91,9 @@ int main(int argc, char **argv){
 
   // Return to MPI
   const int total_iter  = diagData->num_handoffs;
-  int iternum = 1;
+  int iternum = 0;
 
-  for ( ; iternum <= total_iter; iternum++) {
+  for ( ; iternum < total_iter; iternum++) {
     // kayahan debug
     // printf("Handoff to MPI for diagonalization at PE %d\n", CkMyPe());
     nprow   =  diagData->nprow;

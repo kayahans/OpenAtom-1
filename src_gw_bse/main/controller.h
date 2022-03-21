@@ -132,7 +132,7 @@ class Controller : public CBase_Controller {
                      eps_matrix2D_X_proxy, eps_matrix2D_A_proxy,
                      eps_matrix2D_M1_proxy, eps_matrix2D_X1_proxy;
     CProxy_EpsMatrix sdiagT_matrix2D_proxy, sdiagH_matrix2D_proxy, sdiag_matrix2D_proxy;
-    CProxy_EpsMatrix gpp2D_M0_proxy, gpp2D_M1_proxy, gpp2D_T_M0_proxy;
+    CProxy_EpsMatrix gpp2D_M0_proxy, gpp2D_M1_proxy, gpp2D_M2_proxy, gpp2D_T_M0_proxy;
 };
 
 // A struct containing the required info for computing a set of f vectors for a

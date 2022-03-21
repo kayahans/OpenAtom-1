@@ -30,6 +30,7 @@ module eps_matrix {
     entry void cohGPP();
     entry void findAlpha();
     entry void multiply_coulb();
+    entry void zero();
     entry void print(int qindex, int fnum);
     entry void print_col(int num);
     entry void print_row(int num);

@@ -539,11 +539,13 @@ void EpsMatrix::createTranspose(CProxy_EpsMatrix other, bool todo) {
   for(int i=0; i < config.tile_rows; i++) {
     for(int j=0; j < config.tile_cols; j++) {
       if (todo) {
-        complex tranpose = data[IDX_eps(i,j)];
+        // complex tranpose = data[IDX_eps(i,j)];
+        complex tranpose = data[IDX_eps(j,i)];
         tranpose.im *= -1;
         incoming.push_back(tranpose);
       } else {
-        incoming.push_back(data[IDX_eps(i,j)]);
+        // incoming.push_back(data[IDX_eps(i,j)]);
+        incoming.push_back(data[IDX_eps(j,i)]);
       }
     }
   }
@@ -697,7 +699,15 @@ void EpsMatrix::print(int qindex, int fnum) {
   }
   fclose(fp);
 }
-
+void EpsMatrix::zero() {
+  for (int r = 0; r < config.tile_rows; r++) {
+    for (int c = 0; c < config.tile_cols; c++) {
+        data[IDX_eps(r,c)] = 0.0;
+    }
+  }
+  CkCallback cb(CkReductionTarget(Controller, zeroed), controller_proxy);
+  contribute(cb);
+}
 void EpsMatrix::print_row(int num) { 
   int x = thisIndex.x;
   int y = thisIndex.y;

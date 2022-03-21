@@ -70,6 +70,7 @@ module controller {
     entry [reductiontarget] void gpp_omsq_complete();
     entry [reductiontarget] void gpp_vc_complete();
     entry [reductiontarget] void gpp_psi_cache_ready();
+    entry [reductiontarget] void zeroed();
     // entry [reductiontarget] void gpp_debug_complete();
     entry [reductiontarget] void s_ready();
     entry [reductiontarget] void m_multiplied();
@@ -309,6 +310,8 @@ module controller {
           gpp2D_T_M0_proxy = CProxy_EpsMatrix::ckNew(
             cfg2D, opts);
           gpp2D_M1_proxy = CProxy_EpsMatrix::ckNew(
+            cfg2D, opts);
+          gpp2D_M2_proxy = CProxy_EpsMatrix::ckNew(
             cfg2D, opts);
         }
         eps_matrix1D_proxy = CProxy_EpsMatrix::ckNew(
@@ -646,7 +649,6 @@ module controller {
     }
 
     }
-
     entry void formGpp() {
       // Print S-matrix to verify (start)
       // serial {
@@ -664,10 +666,10 @@ module controller {
         // CkPrintf("[CONTROLLER] Transfer Eps to Gpp\n");
         matrixCopy(s_matrix2D_proxy, sdiag_matrix2D_proxy, copyCB);
       }
-
       // HERE below are for S matrix 
       when copyComplete(bool success) serial{
-        sdiag_matrix2D_proxy.print(qindex, 0);  // Print eigenvectors of S to EPS_0 before reading
+        sdiag_matrix2D_proxy.print(qindex, 0);  // Print S to EPS_0 before reading
+#if 0
         std::string filename = "data/S_q" + std::to_string(qindex);
         matrixRead(eps_matrix1D_proxy, filename, readCB);
       }
@@ -675,9 +677,18 @@ module controller {
         matrixCopy(eps_matrix1D_proxy, sdiag_matrix2D_proxy, copyCB);
       }
       when copyComplete(bool success) serial {
-        sdiag_matrix2D_proxy.print(qindex, 1); // Print eigenvectors of S to EPS_1 after reading
+        sdiag_matrix2D_proxy.print(qindex, 1); // Print S to EPS_0 after reading
       // Here ABOVE are for S matrix
-
+#endif
+#if 0
+       std::string filename = "data/Magic_q" + std::to_string(qindex);
+        matrixRead(eps_matrix1D_proxy, filename, readCB);
+      }
+      when readComplete(bool success) serial { 
+        matrixCopy(eps_matrix1D_proxy, sdiag_matrix2D_proxy, copyCB);
+      }
+      when copyComplete(bool success) serial {
+#endif
         // STOP_STEP("Store S Matrix");
         START_STEP("Prepare S matrix to MPI transfer");
         diag_bridge_proxy.prepareData(qindex, real_epsilon_size, qpts);
@@ -703,10 +714,18 @@ module controller {
       when mpi_received_complete () serial {
         STOP_STEP("Transfer S from MPI")
         START_STEP("S Transpose")
-        sdiag_matrix2D_proxy.createTranspose(sdiagT_matrix2D_proxy, false);
-        
-      }
-      when transpose_complete() serial {
+        // sdiag_matrix2D_proxy.createTranspose(sdiagT_matrix2D_proxy, false);
+#if 1
+        sdiag_matrix2D_proxy.print(qindex, 2); // Print eigenvectors to EPS_2 
+#endif
+#if 0
+        sdiag_matrix2D_proxy.print(qindex, 21); // Print eigenvectors to EPS_21 from read S
+#endif
+#if 0
+        sdiag_matrix2D_proxy.print(qindex, 22); // Print eigenvectors to EPS_22 from magic m
+#endif
+      // }
+      // when transpose_complete() serial {
         STOP_STEP("S Transpose")
         START_STEP("GPP Rhodata FFT R to G")
         gpp2D_proxy.RtoG(qindex);
@@ -728,16 +747,25 @@ module controller {
       }
       when transferfromGpp_complete() serial{
         gpp2D_proxy.print(qindex, 1); // Print M0 to GPP_1 files
-        gpp2D_M0_proxy.print(qindex, 2); // Print M0 to EPS_2 files
+        gpp2D_M0_proxy.print(qindex, 3); // Print M0 to EPS_3 files
         gpp2D_M0_proxy.createTranspose(gpp2D_T_M0_proxy, false);
       }
       when transpose_complete() serial {
-      //   //Mggp*V^T = C
-        mat_mul_proxy.do_multiply(gpp2D_M0_proxy, sdiag_matrix2D_proxy, gpp2D_M1_proxy, 1.0);
+      //M0*V = M1
+        mat_mul_proxy.do_multiply(gpp2D_M0_proxy, sdiag_matrix2D_proxy, gpp2D_M1_proxy, 1.0);  // M1
       }
       when m_multiplied() serial {
         STOP_STEP("GPP M1 = M0 * V^T Step 1/2")
-        gpp2D_M1_proxy.print(qindex, 3); // Print M0 mul1 to EPS_3
+#if 1
+        gpp2D_M1_proxy.print(qindex, 4); // Print M0 mul1 to EPS_3
+#endif
+#if 0
+        gpp2D_M1_proxy.print(qindex, 41); // Print M0 mul1 to EPS_3 from read S
+#endif
+#if 0
+        gpp2D_M1_proxy.print(qindex, 42); // Print M0 mul1 to EPS_3 from magic m
+#endif
+
         thisProxy.gpp_M1_complete();
       }
       when gpp_M1_complete() {
@@ -748,23 +776,47 @@ module controller {
         when conjugateComplete() serial {
           //V^H*Mggp = C
           // sdiagH_matrix2D_proxy.print(5);
-          mat_mul_proxy.do_multiply(sdiagH_matrix2D_proxy, gpp2D_M1_proxy, gpp2D_M0_proxy, 1.0);
+          sdiag_matrix2D_proxy.createTranspose(sdiagT_matrix2D_proxy, true);
+        }
+        when transpose_complete() serial {
+          gpp2D_M0_proxy.zero();
+#if 1
+          sdiagT_matrix2D_proxy.print(qindex, 6); // Print M0 mul2 to EPS_5
+#endif
+#if 0
+          sdiagT_matrix2D_proxy.print(qindex, 61); // Print V hermitian from read S
+#endif
+#if 0
+          sdiagT_matrix2D_proxy.print(qindex, 62); // Print V hermitian from magic m
+#endif          
+          
+        }
+        when zeroed() serial {
+          mat_mul_proxy.do_multiply(sdiagT_matrix2D_proxy, gpp2D_M1_proxy, gpp2D_M2_proxy, 1.0); // M2
         }
         when m_multiplied() serial {
           STOP_STEP("GPP M = V^H * M1 Step 2/2")
           // Print to EPS_2 files
-          gpp2D_M0_proxy.print(qindex, 4); // Print M0 mul2 to EPS_4
-
+#if 0
+          gpp2D_M2_proxy.print(qindex, 5); // Print M0 mul2 to EPS_5
+#endif
+#if 1
+          gpp2D_M2_proxy.print(qindex, 51); // Print M0 mul2 to EPS_51 from read S
+#endif
+#if 0
+          gpp2D_M2_proxy.print(qindex, 52); // Print M0 mul2 to EPS_52 from magic m
+#endif
           // Here below is for multiplied MGGP
-          std::string filename = "data/Serial_Mggp2_q" + std::to_string(qindex);
-          matrixRead(eps_matrix1D_proxy, filename, readCB);
-      }
-      when readComplete(bool success) serial { 
-        matrixCopy(eps_matrix1D_proxy, gpp2D_M0_proxy, copyCB);
-      }
-      when copyComplete(bool success) serial {
-        gpp2D_M0_proxy.print(qindex, 5); // Print M0 mul2 to EPS_5
+      //     std::string filename = "data/Serial_Mggp2_q" + std::to_string(qindex);
+      //     matrixRead(eps_matrix1D_proxy, filename, readCB);
+      // }
+      // when readComplete(bool success) serial { 
+      //   matrixCopy(eps_matrix1D_proxy, gpp2D_M0_proxy, copyCB);
+      // }
+      // when copyComplete(bool success) serial {
+      //   gpp2D_M0_proxy.print(qindex, 5); // Print M0 mul2 to EPS_5
         // Here above is for multiplied MGGP
+
         // When S and multiplied MGGP are read from serial, the code works as expected (correct eigenval and correct MGGP)
 
           thisProxy.gpp_M2_complete();
@@ -773,7 +825,7 @@ module controller {
       when gpp_M2_complete() {
         serial {
           // matrixCopy(gpp2D_M0_proxy, gpp2D_proxy, copyCB);
-          gpp2D_M0_proxy.transferToGpp(gpp2D_proxy, false);
+          gpp2D_M2_proxy.transferToGpp(gpp2D_proxy, false);
         }
         // when copyComplete(bool success) serial{ 
         when transferToGpp_complete() serial {

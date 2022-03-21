@@ -64,6 +64,7 @@ class EpsMatrix : public CBase_EpsMatrix {
     void print(int qindex, int fnum);
     void print_col(int num);
     void print_row(int num);
+    void zero();
     void transferToGpp(CProxy_Gpp other, bool todo); 
     void transferFromGpp(CProxy_Gpp other, bool todo); 
     void createCopy(CProxy_EpsMatrix other, bool todo);

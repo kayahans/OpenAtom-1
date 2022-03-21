@@ -388,7 +388,7 @@ void Gpp::calc_omsq() {
     for (int i = 0; i < end_index-start_index; i++ ) {
       omsq[i] = data[IDX_eps(i, i)].re * factor / eigval[i];
       // omsq[i] = i+start_index;
-      printf("i %d omsq %f %.8e factor %f data %f\n", i+start_index , omsq[i], eigval[i], factor, data[IDX_eps(i, i)].re);
+      printf("i %d omsq %f %.8e factor %f data %f\n", i+start_index , omsq[i], eigval[i], factor, data[IDX_eps(i, i)].re);fflush(stdout);
     }
   }
   contribute(CkCallback(CkReductionTarget(Controller, gpp_omsq_complete), controller_proxy));
