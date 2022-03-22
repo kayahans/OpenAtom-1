@@ -50,6 +50,7 @@ class Gpp : public CBase_Gpp {
     Gpp();
     Gpp(MatrixConfig config);
     void RtoG(int qindex);
+    void RtoG_skip();
     void calc_omsq();
     void debug();
     void print(int qindex, int fnum);

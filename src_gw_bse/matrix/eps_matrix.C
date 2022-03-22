@@ -158,171 +158,9 @@ void EpsMatrix::screenedExchange() {
   delete[] contrib_data;
 }
 
-void EpsMatrix::screenedExchangeGPP() {
-  // TODO (kayahans) will be modified, for now just copy/paste from static
-  FVectorCache* f_cache = fvector_cache_proxy.ckLocalBranch();
-  int n = f_cache->getNSize();
-  int tuple_size = K*n;
-  tuple_size += 1;
-  CkReduction::tupleElement *tuple_reduction;
-  tuple_reduction = new CkReduction::tupleElement[tuple_size];
-  complex total_contribution(0.0,0.0);
-  complex *contrib_data;
-  contrib_data = new complex[tuple_size];
-  int ik = 0;
-
-  for (int k = 0; k < K; k++) {
-    for (int i = 0; i < f_cache->getNSize(); i++) {
-        complex contribution(0.0,0.0);
-  //      for (int j = 0; j < f_cache->getNSize(); j++) { //Performs only <n|Sigma|n> as does the fortran code
-  // Uncommenting above loop will perform <n|Sigma|n’>
-        for (int l = 0; l < L; l++) {
-          complex* fi = f_cache->getFVec(k, i, l, thisIndex.x, eps_rows);
-          complex* fj = f_cache->getFVec(k, i, l, thisIndex.y, eps_cols);
-          for (int r = 0; r < config.tile_rows; r++) {
-            for (int c = 0; c < config.tile_cols; c++) {
-              contribution += fi[r]*fj[c].conj()*data[IDX_eps(r,c)];
-            }
-          }
-        }
-        contrib_data[ik] = contribution * -1.0;
-        tuple_reduction[ik] =  CkReduction::tupleElement(sizeof(complex), &(contrib_data[ik]), CkReduction::sum_double);
-        ik++;
-        total_contribution += contribution * -1.0;
-    }
-  }
-
-  tuple_reduction[ik] =  CkReduction::tupleElement(sizeof(complex), &total_contribution, CkReduction::sum_double);
-
-  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tuple_reduction, tuple_size);
-  msg->setCallback(CkCallback(CkIndex_Controller::screenedExchangeComplete(NULL), controller_proxy));
-  contribute(msg);
-  delete[] contrib_data;
+void EpsMatrix::screenedExchange_skipped() {
+  contribute(CkCallback(CkReductionTarget(Controller, screenedExchange_skipped), controller_proxy));
 }
-
-void EpsMatrix::cohGPP(){
-
-  FVectorCache* f_cache = fvector_cache_proxy.ckLocalBranch();
-  PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
-  FFTController* fft_controller = fft_controller_proxy.ckLocalBranch();
-
-  complex* states = psi_cache->getStates();
-  int psi_size = nfft[0]*nfft[1]*nfft[2];
-  std::vector<int> accept_v = f_cache->getAcceptVector();
-
-  int ga[psi_size];
-  int gb[psi_size];
-  int gc[psi_size];
-  fftidx_to_gidx(ga,gb,gc,nfft);
-
-  int n = f_cache->getNSize();
-  int tuple_size = K*n;
-  tuple_size += 1;
-  CkReduction::tupleElement *tuple_reduction;
-  tuple_reduction = new CkReduction::tupleElement[tuple_size];
-  complex *contrib_data;
-  contrib_data = new complex[tuple_size];
-  int ik = 0;
-  complex total_contribution = (0.0,0.0);
-
-  GWBSE *gwbse = GWBSE::get();
-  int* nfft;
-  nfft = gwbse->gw_parallel.fft_nelems;
-  GW_SIGMA *gw_sigma = &(gwbse->gw_sigma);
-  int n_np = gw_sigma->num_sig_matels;
-  int *n_list = gw_sigma->n_list_sig_matels;
-  int *np_list = gw_sigma->np_list_sig_matels;
-
-  complex *f = new complex[n_np*psi_size];
-  std::vector<int> map(psi_size);
-  for (int k = 0; k < K; k++) {
-    int epsilon_size = 0;
-
-    for(int g=0;g<psi_size;g++){
-      if(accept_v[g]){
-        map[epsilon_size] = g;
-        epsilon_size++;
-      }
-    }
-    map.resize(epsilon_size);
-
-    int base_index = k*2*n*psi_size;
-
-
-//This could probably be done once per node and cached
-    for (int i = 0; i < f_cache->getNSize(); i++){
-      int i_index = n_list[i]-1;
-      int j_index = np_list[i]-1;
-
-      int state_index = i*2*psi_size;
-      int f_base = i*psi_size;
-
-      for(int g=0; g < psi_size; g++){
-        f[f_base+g] = states[base_index + state_index + g].conj() * states[base_index + state_index + g];
-      }
-
-
-      fft_controller->setup_fftw_3d(nfft, -1);
-      fftw_complex* in_pointer = fft_controller->get_in_pointer();
-      fftw_complex* out_pointer = fft_controller->get_out_pointer();
-      // Pack our data, do the fft, then get the output
-      put_into_fftbox(nfft, &f[f_base], in_pointer);
-      fft_controller->do_fftw();
-      fftbox_to_array(psi_size, out_pointer, &f[f_base], 1);
-    }
-
-    for (int i = 0; i < f_cache->getNSize(); i++) {
-      int f_base = i*psi_size;
-      complex contribution = (0.0,0.0);
-      for (int r = 0; r < config.tile_rows; r++) {
-        int g1 = thisIndex.x*eps_rows+r;
-        for (int c = 0; c < config.tile_cols; c++) {
-          int g2 = thisIndex.y*eps_cols+c;
-          if(g1>=epsilon_size || g2>=epsilon_size) continue;
-
-          int gdiff[3];
-          gdiff[0] = ga[map[g1]]-ga[map[g2]];
-          gdiff[1] = gb[map[g1]]-gb[map[g2]];
-          gdiff[2] = gc[map[g1]]-gc[map[g2]];
-          // flip the value and
-          // set back to gdiff values
-
-          for (int ii=0; ii<3; ii++){
-            if (gdiff[ii] < -nfft[ii]/2){
-              gdiff[ii] += nfft[ii];
-            }
-            if (gdiff[ii] >= nfft[ii]/2){
-              gdiff[ii] -= nfft[ii]/2;
-            }
-          }
-
-          int gdiffIndex = -1;
-          for (int ii=0; ii<psi_size; ii++){
-            if (gdiff[0]==ga[ii] && gdiff[1]==gb[ii] && gdiff[2]==gc[ii]){
-              gdiffIndex = ii;
-              break;
-            }
-          }
-
-          contribution += f[f_base+gdiffIndex]*data[IDX_eps(r,c)];
-        }
-      }
-      contrib_data[ik] = contribution;
-      tuple_reduction[ik] =  CkReduction::tupleElement(sizeof(complex), &(contrib_data[ik]), CkReduction::sum_double);
-      ik++;
-      total_contribution += contribution;
-    }
-  } //end of K loop
-
-  tuple_reduction[ik] =  CkReduction::tupleElement(sizeof(complex), &total_contribution, CkReduction::sum_double);
-
-  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tuple_reduction, tuple_size);
-  msg->setCallback(CkCallback(CkIndex_Controller::cohComplete(NULL), controller_proxy));
-  contribute(msg);
-  delete[] contrib_data;
-  delete[] f;
-}
-
 
 void EpsMatrix::bareExchange() {
   complex total_contribution = (0.0,0.0);
@@ -371,7 +209,7 @@ void EpsMatrix::bareExchange() {
   }
 
   tuple_reduction[ik] =  CkReduction::tupleElement(sizeof(complex), &total_contribution, CkReduction::sum_double);
-
+  // kayahans
   CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tuple_reduction, tuple_size);
   msg->setCallback(CkCallback(CkIndex_Controller::bareExchangeComplete(NULL), controller_proxy));
   contribute(msg);
@@ -500,6 +338,11 @@ void EpsMatrix::coh(){
   delete[] contrib_data;
   delete[] f;
 }
+
+void EpsMatrix::coh_skipped() {
+  contribute(CkCallback(CkReductionTarget(Controller, coh_skipped), controller_proxy));
+}
+
 
 void EpsMatrix::findAlpha() {
   if (config.chareCols() != 1) {
@@ -705,8 +548,8 @@ void EpsMatrix::zero() {
         data[IDX_eps(r,c)] = 0.0;
     }
   }
-  CkCallback cb(CkReductionTarget(Controller, zeroed), controller_proxy);
-  contribute(cb);
+  // CkCallback cb(CkReductionTarget(Controller, zeroed), controller_proxy);
+  // contribute(cb);
 }
 void EpsMatrix::print_row(int num) { 
   int x = thisIndex.x;

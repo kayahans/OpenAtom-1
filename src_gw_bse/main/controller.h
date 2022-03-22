@@ -87,6 +87,8 @@ class Controller : public CBase_Controller {
                                     std::vector<double> gb, 
                                     std::vector<double> gc, 
                                     int ng);
+    // void fft_rhodata(int qindex);
+    // void fft_rhodata_skip();
   private:
     bool do_output;
     int msg_received;
@@ -102,7 +104,7 @@ class Controller : public CBase_Controller {
     double alat;
     double vol;
     complex bare_x, screen_x, coh;
-    complex **bare_x_final, **screen_x_final, **coh_final;
+    complex **bare_x_final, **screen_x_final, **coh_final, **sigma_final;
     std::vector<double> vcoulb;
     double shift[3];
     unsigned K, L, M, *Q, Bands, pipeline_stages;
@@ -131,8 +133,8 @@ class Controller : public CBase_Controller {
     CProxy_EpsMatrix eps_matrix2D_m_proxy, eps_matrix2D_mT_proxy,
                      eps_matrix2D_X_proxy, eps_matrix2D_A_proxy,
                      eps_matrix2D_M1_proxy, eps_matrix2D_X1_proxy;
-    CProxy_EpsMatrix sdiagT_matrix2D_proxy, sdiagH_matrix2D_proxy, sdiag_matrix2D_proxy;
-    CProxy_EpsMatrix gpp2D_M0_proxy, gpp2D_M1_proxy, gpp2D_M2_proxy, gpp2D_T_M0_proxy;
+    CProxy_EpsMatrix sdiagT_matrix2D_proxy, sdiag_matrix2D_proxy;
+    CProxy_EpsMatrix gpp2D_M0_proxy, gpp2D_M1_proxy;
 };
 
 // A struct containing the required info for computing a set of f vectors for a
@@ -181,6 +183,7 @@ class PsiCache : public CBase_PsiCache {
     double* get_gpp_eige(int qindex);
     double* get_gpp_omsq(int qindex);
     complex* get_gpp_eigv(int qindex, int alpha);
+    void reset_gpp_counters();
 
     int* getRhosize();
     bool in_np_list(int n_index);

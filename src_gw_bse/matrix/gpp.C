@@ -236,6 +236,11 @@ void Gpp::RtoG(int qindex) {
   // // contribute(CkCallback(CkReductionTarget(Controller, gpp_fft_complete), controller_proxy));
 }
 
+void Gpp::RtoG_skip() {
+  contribute(CkCallback(CkReductionTarget(Controller, RtoG_skipped), controller_proxy));
+}
+
+
 void Gpp::print_col(int num) { 
   int x = thisIndex.x;
   int y = thisIndex.y;
@@ -352,7 +357,7 @@ void Gpp::calc_M0() {
         } else if (dp11 < 1E-12 && dp22 > 1E-12) {
           // Mggp[ig1][ig2] = 0.0;
           data[IDX_eps(ig1, ig2)] = 0.0;
-        } else if (dp11 > 1E-12 && dp22 < 1E-12) {          
+        } else if (dp11 > 1E-12 && dp22 < 1E-12) {
           // Mggp[ig1][ig2] = 0.0; 
           data[IDX_eps(ig1, ig2)] = 0.0;
         } else {
@@ -387,8 +392,8 @@ void Gpp::calc_omsq() {
     end_index = ( end_index < ng) ? end_index : ng;
     for (int i = 0; i < end_index-start_index; i++ ) {
       omsq[i] = data[IDX_eps(i, i)].re * factor / eigval[i];
-      // omsq[i] = i+start_index;
-      printf("i %d omsq %f %.8e factor %f data %f\n", i+start_index , omsq[i], eigval[i], factor, data[IDX_eps(i, i)].re);fflush(stdout);
+      printf("i %d omsq %f %.8e factor %f data %f\n", i+start_index , omsq[i], eigval[i], factor, data[IDX_eps(i, i)].re);
+      fflush(stdout);
     }
   }
   contribute(CkCallback(CkReductionTarget(Controller, gpp_omsq_complete), controller_proxy));
@@ -418,22 +423,6 @@ void Gpp::print(int qindex, int fnum) {
   int global_row, global_col;
   int i = 0;
   FILE* fp = fopen(fname, "w");
-  // int ig1_start = thisIndex.x * eps_rows;
-  // int ig2_start = thisIndex.y * eps_cols;
-  // int ig1_end = (ig1_start + eps_rows > ng) ? ng : ig1_start + eps_rows;
-  // int ig2_end = (ig2_start + eps_cols > ng) ? ng : ig2_start + eps_cols;
-  // // CkPrintf("pe %d tile %d %d %d %d ng %d\n", CKMYPE(), ig1_start, ig2_start, ig1_end, ig2_end, ng);
-  // int ig1_glob, ig2_glob;
-  // for (int ig1 = 0; ig1 < ig1_end-ig1_start; ig1++) {
-  //   ig1_glob = ig1 + ig1_start;
-  //   for (int ig2 = 0; ig2 < ig2_end-ig2_start; ig2++) {
-  //     ig2_glob = ig2 + ig2_start;
-  //     double re = data[IDX_eps(ig1, ig2)].re;
-  //     double im = data[IDX_eps(ig1, ig2)].im;
-  //     fprintf(fp, "%d %d %d %d %.8e %.8e\n", x, y, ig1_glob, ig2_glob, re, im);
-  //   }
-  // }
-  // int global_row, global_col;
   for (int r = 0; r < config.tile_rows; r++) {
     for (int c = 0; c < config.tile_cols; c++) {
         global_row = x*config.tile_rows + r;
@@ -444,22 +433,9 @@ void Gpp::print(int qindex, int fnum) {
       i++;
     }
   }
-
-  // for (int r = 0; r < config.tile_rows; r++) {
-  //   for (int c = 0; c < config.tile_cols; c++) {
-  //       global_row = x*config.tile_rows + r;
-  //       global_col = y*config.tile_cols + c;
-  //       // double re = data[c*config.tile_rows + r].re;
-  //       // double im = data[c*config.tile_rows + r].im;
-  //       double re = data[IDX_eps(global_row, global_col)].re;
-  //       double im = data[IDX_eps(global_row, global_col)].im;
-  //       fprintf(fp, "%d %d %d %d %.8e %.8e\n", x, y, global_row, global_col, re, im);
-  //       // CkPrintf("[EPSMATRIX] x/y %d %d global_r/c %d %d val %.8e\n", x, y, global_row, global_col, val);
-  //     i++;
-  //   }
-  // }
   fclose(fp);
 }
+
 void Gpp::debug() {
   int mype = CkMyPe();
   int r = config.tile_rows;
@@ -512,7 +488,7 @@ void Gpp::sendToCacheE(int total_size) {
   // TODO keep it like this for now since GPP array size should always be larger than num nodes
   if (thisIndex.y == 0) {
     GppEMessage* msge;
-    // printf("Gpp xy %d %d %f %f %f %f\n", thisIndex.x, thisIndex.y, eigval[0], eigval[end_index-1], omsq[0], omsq[end_index-1]);
+    printf("Gpp xy %d %d %f %f %f %f\n", thisIndex.x, thisIndex.y, eigval[0], eigval[end_index-1], omsq[0], omsq[end_index-1]);
     msge = new (size) GppEMessage(size, eigval);
     msge->spin_index = 0; // TODO 
     msge->q_index = qindex;

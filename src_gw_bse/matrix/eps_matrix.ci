@@ -25,9 +25,9 @@ module eps_matrix {
     entry void receiveFs(Phase3Message*);
     entry void bareExchange();
     entry void screenedExchange();
-    entry void screenedExchangeGPP();
+    entry void screenedExchange_skipped();
     entry void coh();
-    entry void cohGPP();
+    entry void coh_skipped();
     entry void findAlpha();
     entry void multiply_coulb();
     entry void zero();

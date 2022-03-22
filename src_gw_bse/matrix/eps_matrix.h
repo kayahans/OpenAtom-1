@@ -53,10 +53,10 @@ class EpsMatrix : public CBase_EpsMatrix {
     void round_done(void);
     void findAlpha(void);
     void screenedExchange();
-    void screenedExchangeGPP();
+    void screenedExchange_skipped();
     void bareExchange();
     void coh();
-    void cohGPP();
+    void coh_skipped();
     void scalar_multiply(double alpha);
     void convergence_check(CProxy_EpsMatrix cmp_proxy);
     void add_compl_two();

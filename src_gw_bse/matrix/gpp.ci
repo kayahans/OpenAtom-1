@@ -16,6 +16,7 @@ module gpp {
     entry void print_col(int num);
     entry void calc_omsq();
     entry void RtoG(int qindex);
+    entry void RtoG_skip();
     entry void calculate_vc();
     entry void debug();
     entry void recvCopy(std::vector<complex> new_data);    

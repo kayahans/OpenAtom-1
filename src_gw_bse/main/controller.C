@@ -43,15 +43,17 @@ Controller::Controller() {
   bare_x_final = new complex*[K];
   screen_x_final = new complex*[K];
   coh_final = new complex*[K];
-
+  sigma_final = new complex*[K];
   for ( int i=0; i<K; i++) {
     bare_x_final[i] = new complex[Bands];
     screen_x_final[i] = new complex[Bands];
     coh_final[i] = new complex[Bands];
+    sigma_final[i] = new complex[Bands];
     for( int j=0; j<Bands; j++) {
       bare_x_final[i][j] = (0.0,0.0);
       screen_x_final[i][j] = (0.0,0.0);
       coh_final[i][j] = (0.0,0.0);
+      sigma_final[i][j] = (0.0,0.0);
     }
   }
   n_list = gw_sigma->n_list_sig_matels;
@@ -146,6 +148,49 @@ void Controller::got_vcoulb(std::vector<double> vcoulb_in, double vcoulb0,
   psi_cache_proxy.setVCoulb(vcoulb_in, vcoulb0, ga, gb, gc, ng);
 }
 
+// void Controller::fft_rhodata(int qindex){
+//   if (qindex == 0) {
+//     //FFT Rhodata
+//     FFTController* fft_controller = fft_controller_proxy.ckLocalBranch();
+//     PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
+//     complex* rhoData = psi_cache->getRhoData();
+//     int* nr = psi_cache->getRhosize();
+//     int nrsize = nr[0]*nr[1]*nr[2];
+
+//     int forward = -1;
+//     fft_controller->setup_fftw_3d(nr,forward);
+//     fftw_complex* in_pointer = fft_controller->get_in_pointer();
+//     fftw_complex* out_pointer = fft_controller->get_out_pointer();
+//     put_into_fftbox(nr, rhoData, in_pointer);
+//     fft_controller->do_fftw();
+//     // delete [] rhoData;
+//     // rhoData = new complex[ndata];
+//     fftbox_to_array(nrsize, out_pointer, rhoData, 1.0);
+//     // 
+    
+//     PsiMessage* msg = new (nrsize) PsiMessage(nrsize, rhoData);
+//     msg->spin_index = -1;
+//     msg->k_index = qindex;
+//     msg->state_index = -1;
+//     msg->shifted = false;
+//     psi_cache_proxy.send_rhodata(msg);
+//   } 
+// }
+
+// void Controller::prepare_n3_sigma(){
+//   double* gpp_omsq = psi_cache->get_gpp_omsq(iq);
+//   int ng = psi_cache->get_ng();
+//   WINDOWING* WIN = psi_cache->getWin();
+//   WIN->sigma_win(w, gpp_omsq, ng);
+//   WIN->searchwins("Sigma"); // on the fly windowing optimization
+// }
+// void Controller::prepare_n3_sigma(){
+//   double* gpp_omsq = psi_cache->get_gpp_omsq(iq);
+//   int ng = psi_cache->get_ng();
+//   WINDOWING* WIN = psi_cache->getWin();
+//   WIN->sigma_win(w, gpp_omsq, ng);
+//   WIN->searchwins("Sigma"); // on the fly windowing optimization
+// }
 PsiCache::PsiCache() {
   states_received = 0;
   gppv_received = 0;
@@ -399,14 +444,15 @@ void PsiCache::receiveGppE(GppEMessage* msg) {
   // std::copy(msg->eigv, msg->eigv+ng, gpp_eigv[msg->q_index][msg->alpha_idx]);
   
   
-  // fflush(stdout);
+  fflush(stdout);
   gppe_received++;
   
   for (int i = 0; i < size; i++) {
     gpp_eige[msg->q_index][start_idx+i] = msg->eige[i];
   }
-  // printf("GPPE %d %d %d %d %f %f %f \n", msg->q_index, msg->size, gppe_received, start_idx, msg->eige[0], msg->eige[size-1], gpp_eige[msg->q_index][0]);
   int tot_sent = msg->tot_sent;
+  // printf("GPPE %d %d %d %d %d %f %f %f \n", tot_sent, msg->q_index, msg->size, gppe_received, start_idx, msg->eige[0], msg->eige[size-1], gpp_eige[msg->q_index][0]);
+  
   if(gppe_received == tot_sent) {
     // printf("GPPE %u %u %d\n", msg->q_index, msg->size, gppe_received);
     // std::copy(msg->eige, msg->eige+size, gpp_eige[msg->q_index]);
@@ -445,6 +491,13 @@ void PsiCache::receiveGppO(GppEMessage* msg) {
     contribute(CkCallback(CkReductionTarget(Controller,gppOCachesFilled), controller_proxy));
     delete msg;    
   }
+}
+
+void PsiCache::reset_gpp_counters() {
+  gppe_received = 0;
+  gppv_received = 0;
+  gppo_received = 0;
+  contribute(CkCallback(CkReductionTarget(Controller,gpp_counters_reset), controller_proxy));
 }
 
 void PsiCache::send_rhodata(PsiMessage* msg) {
@@ -810,6 +863,7 @@ void PsiCache::init_gpp_cache() {
     }
   }
   // printf("PsiCache GPP ready numq %d num_alpha %d ng %d\n", num_q, num_alpha, ng);
+  // TODO (if qindex > 0 then first safely erase older memory)
   contribute(CkCallback(CkReductionTarget(Controller,gpp_psi_cache_ready), controller_proxy));
 }
 
