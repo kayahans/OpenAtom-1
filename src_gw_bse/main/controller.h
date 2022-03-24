@@ -170,7 +170,7 @@ class PsiCache : public CBase_PsiCache {
     complex* getPsi(unsigned, unsigned, unsigned) const;
     complex* getF(unsigned,unsigned) const;
     void setVCoulb(std::vector<double> vcoulb_in, double vcoulb0, std::vector<double> _ga, std::vector<double> _gb, std::vector<double>_gc, int ng);
-    void init_gpp_cache();
+    void init_gpp_cache(int qindex);
     std::vector<double> getVCoulb();
     std::vector<double> get_ga();
     std::vector<double> get_gb();
@@ -180,10 +180,10 @@ class PsiCache : public CBase_PsiCache {
     double getVCoulb0();
     complex* getStates();
     complex* getRhoData();
-    double* get_gpp_eige(int qindex);
-    double* get_gpp_omsq(int qindex);
-    complex* get_gpp_eigv(int qindex, int alpha);
-    void reset_gpp_counters();
+    double* get_gpp_eige();
+    double* get_gpp_omsq();
+    complex* get_gpp_eigv(int alpha);
+    // void reset_gpp_counters();
 
     int* getRhosize();
     bool in_np_list(int n_index);
@@ -194,13 +194,14 @@ class PsiCache : public CBase_PsiCache {
     void reportInfo();
     LAPLACE* getLP();
     WINDOWING* getWin();
-
+    void calculate_windows();
+    
     int elements;
     int total_elements;
     complex*** psis;
-    complex*** gpp_eigv;
-    double** gpp_eige;
-    double** gpp_omsq;
+    complex** gpp_eigv;
+    double* gpp_eige;
+    double* gpp_omsq;
     std::vector<std::pair<int, int>> regions;
     double get_OccOcc(int k, int iv);
   private:
@@ -226,6 +227,7 @@ class PsiCache : public CBase_PsiCache {
     std::vector<double> gb;
     std::vector<double> gc;
     unsigned ng;
+    unsigned ng_prev;
     complex* umklapp_factor;
     int n_np;
     int states_received;

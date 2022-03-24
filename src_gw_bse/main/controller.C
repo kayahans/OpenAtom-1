@@ -148,49 +148,6 @@ void Controller::got_vcoulb(std::vector<double> vcoulb_in, double vcoulb0,
   psi_cache_proxy.setVCoulb(vcoulb_in, vcoulb0, ga, gb, gc, ng);
 }
 
-// void Controller::fft_rhodata(int qindex){
-//   if (qindex == 0) {
-//     //FFT Rhodata
-//     FFTController* fft_controller = fft_controller_proxy.ckLocalBranch();
-//     PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
-//     complex* rhoData = psi_cache->getRhoData();
-//     int* nr = psi_cache->getRhosize();
-//     int nrsize = nr[0]*nr[1]*nr[2];
-
-//     int forward = -1;
-//     fft_controller->setup_fftw_3d(nr,forward);
-//     fftw_complex* in_pointer = fft_controller->get_in_pointer();
-//     fftw_complex* out_pointer = fft_controller->get_out_pointer();
-//     put_into_fftbox(nr, rhoData, in_pointer);
-//     fft_controller->do_fftw();
-//     // delete [] rhoData;
-//     // rhoData = new complex[ndata];
-//     fftbox_to_array(nrsize, out_pointer, rhoData, 1.0);
-//     // 
-    
-//     PsiMessage* msg = new (nrsize) PsiMessage(nrsize, rhoData);
-//     msg->spin_index = -1;
-//     msg->k_index = qindex;
-//     msg->state_index = -1;
-//     msg->shifted = false;
-//     psi_cache_proxy.send_rhodata(msg);
-//   } 
-// }
-
-// void Controller::prepare_n3_sigma(){
-//   double* gpp_omsq = psi_cache->get_gpp_omsq(iq);
-//   int ng = psi_cache->get_ng();
-//   WINDOWING* WIN = psi_cache->getWin();
-//   WIN->sigma_win(w, gpp_omsq, ng);
-//   WIN->searchwins("Sigma"); // on the fly windowing optimization
-// }
-// void Controller::prepare_n3_sigma(){
-//   double* gpp_omsq = psi_cache->get_gpp_omsq(iq);
-//   int ng = psi_cache->get_ng();
-//   WINDOWING* WIN = psi_cache->getWin();
-//   WIN->sigma_win(w, gpp_omsq, ng);
-//   WIN->searchwins("Sigma"); // on the fly windowing optimization
-// }
 PsiCache::PsiCache() {
   states_received = 0;
   gppv_received = 0;
@@ -267,7 +224,7 @@ PsiCache::PsiCache() {
 
   lp = new LAPLACE(gwbse->gw_epsilon.Eocc, gwbse->gw_epsilon.Eunocc);
   WIN = new WINDOWING(gwbse->gw_epsilon.Eocc, gwbse->gw_epsilon.Eunocc);
-  WIN->read_from_file();
+  // WIN->read_from_file();
   char fromFile[200];
   Occ_occ = new double**[1];
   Occ_unocc = new double**[1];
@@ -304,19 +261,26 @@ double PsiCache::get_OccOcc(int k, int iv) {
   return Occ_occ[0][k][iv];//tmp;
 }
 
-double* PsiCache::get_gpp_eige(int q) {
-  return gpp_eige[q];//tmp;
+double* PsiCache::get_gpp_eige() {
+  return gpp_eige;
 }
 
-double* PsiCache::get_gpp_omsq(int q) {
-  return gpp_omsq[q];//tmp;
+double* PsiCache::get_gpp_omsq() {
+  return gpp_omsq;
 }
 
-complex* PsiCache::get_gpp_eigv(int q, int alpha) {
+complex* PsiCache::get_gpp_eigv(int alpha) {
   // printf("eigv %d %d\n", q, alpha);
-  return gpp_eigv[q][alpha];//tmp;
+  return gpp_eigv[alpha];
 }
 
+void PsiCache::calculate_windows() {
+  int w = 0.23;
+  char calc[] = "Sigma";
+  WIN->sigma_win(w, gpp_omsq, ng);
+  WIN->searchwins(calc); // on the fly windowing optimization
+  contribute(CkCallback(CkReductionTarget(Controller,gpp_windows_ready), controller_proxy));
+}
 
 LAPLACE *PsiCache::getLP() {
   return lp;
@@ -418,7 +382,7 @@ void PsiCache::receiveGppV(GppVMessage* msg) {
     CkAbort("Error: We don't support multiple spins yet!\n");
   }
   int size = msg->size;
-  std::copy(msg->eigv, msg->eigv+size, gpp_eigv[msg->q_index][msg->alpha_idx]);
+  std::copy(msg->eigv, msg->eigv+size, gpp_eigv[msg->alpha_idx]);
   // std::copy(msg->eige, msg->eige+ng, gpp_eige[msg->q_index]);
   fflush(stdout);
   gppv_received++;
@@ -448,7 +412,7 @@ void PsiCache::receiveGppE(GppEMessage* msg) {
   gppe_received++;
   
   for (int i = 0; i < size; i++) {
-    gpp_eige[msg->q_index][start_idx+i] = msg->eige[i];
+    gpp_eige[start_idx+i] = msg->eige[i];
   }
   int tot_sent = msg->tot_sent;
   // printf("GPPE %d %d %d %d %d %f %f %f \n", tot_sent, msg->q_index, msg->size, gppe_received, start_idx, msg->eige[0], msg->eige[size-1], gpp_eige[msg->q_index][0]);
@@ -479,7 +443,7 @@ void PsiCache::receiveGppO(GppEMessage* msg) {
   // int num_nodes = CkNumNodes();
 
   for (int i = 0; i < size; i++) {
-    gpp_omsq[msg->q_index][start_idx+i] = msg->eige[i];
+    gpp_omsq[start_idx+i] = msg->eige[i];
     // printf("gpp i %d val %f\n", start_idx+i, gpp_omsq[msg->q_index][start_idx+i]);
   } 
   // printf("GPPO %d %d %d %d %f %f %f\n", msg->q_index, msg->size, gppo_received, start_idx, msg->eige[0], msg->eige[size-1], gpp_omsq[msg->q_index][15]);
@@ -493,12 +457,12 @@ void PsiCache::receiveGppO(GppEMessage* msg) {
   }
 }
 
-void PsiCache::reset_gpp_counters() {
-  gppe_received = 0;
-  gppv_received = 0;
-  gppo_received = 0;
-  contribute(CkCallback(CkReductionTarget(Controller,gpp_counters_reset), controller_proxy));
-}
+// void PsiCache::reset_gpp_counters() {
+//   gppe_received = 0;
+//   gppv_received = 0;
+//   gppo_received = 0;
+//   contribute(CkCallback(CkReductionTarget(Controller,gpp_counters_reset), controller_proxy));
+// }
 
 void PsiCache::send_rhodata(PsiMessage* msg) {
   CkAssert(msg->spin_index == -1);
@@ -847,23 +811,31 @@ void PsiCache::setVCoulb(std::vector<double> vcoulb_in, double vcoulb0, std::vec
   contribute(CkCallback(CkReductionTarget(Controller,prepare_epsilon), controller_proxy));
 }
 
-void PsiCache::init_gpp_cache() {
+void PsiCache::init_gpp_cache(int qindex) {
   GWBSE* gwbse = GWBSE::get();
   int num_q = gwbse->gw_parallel.n_qpt;  
   int num_alpha = ng; // TODO num alpha can be less than ng
-  gpp_eigv = new complex**[num_q];
-  gpp_eige = new double*[num_q];
-  gpp_omsq = new double*[num_q];
-  for(int iq = 0; iq < num_q; iq++) {
-    gpp_eigv[iq] = new complex* [ng];
-    gpp_eige[iq] = new double[ng];
-    gpp_omsq[iq] = new double[ng];
-    for (int ia = 0; ia < num_alpha; ia++) {
-      gpp_eigv[iq][ia] = new complex [ng];
+  if (qindex > 0) {
+    // TODO Ideally if we knew the largest ng, then we can allocate this memory once and bookkeep
+    delete[] gpp_eige;
+    delete[] gpp_omsq;
+    for (int i = 0; i < ng_prev; i++) {
+      delete[] gpp_eigv[i];
     }
+    delete[] gpp_eigv;
+  } 
+
+  gpp_eigv = new complex*[num_alpha];
+  for (int ia = 0; ia < num_alpha; ia++) {
+    gpp_eigv[ia] = new complex [ng];
   }
-  // printf("PsiCache GPP ready numq %d num_alpha %d ng %d\n", num_q, num_alpha, ng);
-  // TODO (if qindex > 0 then first safely erase older memory)
+  gpp_eige = new double[ng];
+  gpp_omsq = new double[ng];
+  gppe_received = 0;
+  gppv_received = 0;
+  gppo_received = 0;
+
+  ng_prev = ng;
   contribute(CkCallback(CkReductionTarget(Controller,gpp_psi_cache_ready), controller_proxy));
 }
 

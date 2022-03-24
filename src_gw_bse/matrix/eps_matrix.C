@@ -176,7 +176,10 @@ void EpsMatrix::bareExchange() {
   contrib_data = new complex[tuple_size];
   int ik = 0;
   std::vector<double> vcoulb = psi_cache->getVCoulb();
-
+  if (thisIndex.x == 0 && thisIndex.y==0) {
+    printf("bareExchange size %d \n", tuple_size);
+  }
+  
   if(qindex==0)
     vcoulb[0] = psi_cache->getVCoulb0();
 
@@ -240,7 +243,9 @@ void EpsMatrix::coh(){
   contrib_data = new complex[tuple_size];
   int ik = 0;
   complex total_contribution = (0.0,0.0);
-
+  if (thisIndex.x == 0 && thisIndex.y==0) {
+    printf("coh size %d \n", tuple_size);
+  }
   GWBSE *gwbse = GWBSE::get();
   int* nfft;
   nfft = gwbse->gw_parallel.fft_nelems;
@@ -340,7 +345,7 @@ void EpsMatrix::coh(){
 }
 
 void EpsMatrix::coh_skipped() {
-  contribute(CkCallback(CkReductionTarget(Controller, coh_skipped), controller_proxy));
+  // contribute(CkCallback(CkReductionTarget(Controller, coh_skipped), controller_proxy));
 }
 
 
@@ -387,8 +392,7 @@ void EpsMatrix::createTranspose(CProxy_EpsMatrix other, bool todo) {
         tranpose.im *= -1;
         incoming.push_back(tranpose);
       } else {
-        // incoming.push_back(data[IDX_eps(i,j)]);
-        incoming.push_back(data[IDX_eps(j,i)]);
+        incoming.push_back(data[IDX_eps(i,j)]);
       }
     }
   }

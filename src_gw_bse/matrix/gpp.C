@@ -183,7 +183,11 @@ void Gpp::calculate_vc() {
   std::copy(vcoulbp.begin(), vcoulbp.end(), vcoulb);
   if(qindex==0)
       vcoulb[0] = psi_cache->getVCoulb0();  
-  omsq = new double [eps_cols];
+  
+  // omsq values are stored only on the diagonal tiles
+  if (thisIndex.x == thisIndex.y) {
+    omsq = new double [eps_cols];
+  }
   // eigval = new double [ng];
   contribute(CkCallback(CkReductionTarget(Controller, gpp_vc_complete), controller_proxy));
   // Check for garbage collector?
@@ -386,16 +390,20 @@ void Gpp::calc_M0() {
 
 
 void Gpp::calc_omsq() {
+  // omsq values are stored only on the diagonal tile elements
   if (thisIndex.x == thisIndex.y) {
     int start_index = thisIndex.x * eps_cols;
     int end_index = (thisIndex.x + 1) * eps_cols;
     end_index = ( end_index < ng) ? end_index : ng;
     for (int i = 0; i < end_index-start_index; i++ ) {
       omsq[i] = data[IDX_eps(i, i)].re * factor / eigval[i];
-      printf("i %d omsq %f %.8e factor %f data %f\n", i+start_index , omsq[i], eigval[i], factor, data[IDX_eps(i, i)].re);
-      fflush(stdout);
+      if (i == 0) {
+        printf("i %d omsq %f %.8e factor %f data %f\n", i+start_index , omsq[i], eigval[i], factor, data[IDX_eps(i, i)].re);
+        fflush(stdout);
+      }
     }
   }
+
   contribute(CkCallback(CkReductionTarget(Controller, gpp_omsq_complete), controller_proxy));
 }
 
@@ -488,7 +496,7 @@ void Gpp::sendToCacheE(int total_size) {
   // TODO keep it like this for now since GPP array size should always be larger than num nodes
   if (thisIndex.y == 0) {
     GppEMessage* msge;
-    printf("Gpp xy %d %d %f %f %f %f\n", thisIndex.x, thisIndex.y, eigval[0], eigval[end_index-1], omsq[0], omsq[end_index-1]);
+    // printf("Gpp xy %d %d %f %f %f %f\n", thisIndex.x, thisIndex.y, eigval[0], eigval[end_index-1], omsq[0], omsq[end_index-1]);
     msge = new (size) GppEMessage(size, eigval);
     msge->spin_index = 0; // TODO 
     msge->q_index = qindex;
@@ -505,7 +513,7 @@ void Gpp::sendToCacheO(int total_size) {
   int size = end_index - start_index;
   // printf("GPP2d %d %d %d %u\n", thisIndex.x, thisIndex.y, config.tile_rows, size);
   // TODO keep it like this for now since GPP array size should always be larger than num nodes
-  if (thisIndex.y == 0) {
+  if (thisIndex.x == thisIndex.y) {
     GppEMessage* msgo;
     msgo = new (size) GppEMessage(size, omsq);
     msgo->spin_index = 0; // TODO 
@@ -515,4 +523,6 @@ void Gpp::sendToCacheO(int total_size) {
     psi_cache_proxy.receiveGppO(msgo);
   }
 }
+
+
 #include "gpp.def.h"

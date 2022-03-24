@@ -10,8 +10,8 @@ module psi_cache {
     entry [exclusive] void receiveGppO(GppEMessage*);
     entry [exclusive] void send_rhodata(PsiMessage*);
     entry [exclusive] void computeFs(PsiMessage*);
-    entry void init_gpp_cache();
-    entry void reset_gpp_counters();
+    entry void init_gpp_cache(int qindex);
+    entry void calculate_windows();
     entry void reportFTime();
     entry void setVCoulb(std::vector<double>, double, std::vector<double> _ga, std::vector<double> _gb, std::vector<double>_gc, int ng);
     entry void setQIndex(int qindex);

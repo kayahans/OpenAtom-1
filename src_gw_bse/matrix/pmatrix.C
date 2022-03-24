@@ -396,7 +396,6 @@ for(int i=0;i<ndata*ndata;i++)
 
 void PMatrix::sigma_init(std::vector<int> _accept) {
   accept = _accept;
-  // printf("sigma %d %d %f\n", thisIndex.x, thisIndex.y, accept[0]);
   contribute(CkCallback(CkReductionTarget(Controller, sigma_n3_initialized), controller_proxy));
 }
 
@@ -406,14 +405,13 @@ void PMatrix::sigma() {
   PsiCache* psi_cache = psi_cache_proxy.ckLocalBranch();
   WINDOWING* WIN = psi_cache->getWin();
   // System energies, parameters
-  int nq = 1; //gwbse->gw_parallel.K; // for now nq = nkpt TODO kayahans hardcoded
+  // int nq = 1; //gwbse->gw_parallel.K; // for now nq = nkpt TODO kayahans hardcoded
   int nocc = gwbse->gw_parallel.L;
   int nunocc = gwbse->gw_parallel.M;
   double*** e_occ = gwbse->gw_epsilon.Eocc;
   double*** e_unocc = gwbse->gw_epsilon.Eunocc;
   int nkpt = gwbse->gw_parallel.K;
   int nspin = 1; // TODO (kayahans) hardcoded
-  
   // Set up regioning data
   psi_ndata_local = config.tile_rows;
   tile_size = config.tile_rows * config.tile_cols;
@@ -437,26 +435,9 @@ void PMatrix::sigma() {
   }  
   // // Sigma mtxels, frequencies
   double w = 0.23;
-  std::vector<SIGMAINDICES> sigma_index_list;
-  SIGMAINDICES n44(w, 4,4);
-  SIGMAINDICES n55(w, 5,5);
-  sigma_index_list.push_back(n44);
-  sigma_index_list.push_back(n55);
-  int ik = 0;
   int is = 0;
-  
-
-  FVectorCache* f_cache = fvector_cache_proxy.ckLocalBranch();
-  int n = f_cache->getNSize(); // number of matrix elements
-  int tuple_size = nkpt*n;
-  tuple_size += 1;
-  CkReduction::tupleElement *tuple_reduction;
-  tuple_reduction = new CkReduction::tupleElement[tuple_size];
-  complex *contrib_data;
-  contrib_data = new complex[tuple_size];
-  complex total_contribution = (0.0,0.0);
-
   // 1. Loop over occ/unocc
+  // bool first = true;
   for (int bloop=0; bloop < 2; bloop++) {
     bool bIsOccupied;
     if (bloop == 0)
@@ -470,21 +451,23 @@ void PMatrix::sigma() {
     unsigned ikq;
     int umklapp[3];
     int iq = qindex;
-    kqIndex(ik, ikq, umklapp);
-    double* gpp_eig = psi_cache->get_gpp_eige(iq);
-    double* gpp_omsq = psi_cache->get_gpp_omsq(iq);
+    
+    double* gpp_eig = psi_cache->get_gpp_eige();
+    double* gpp_omsq = psi_cache->get_gpp_omsq();
     int ng = psi_cache->get_ng();
-    // WIN->sigma_win(w, gpp_omsq, ng);
-    // WIN->searchwins("Sigma"); // on the fly windowing optimization
-    if (thisIndex.x == 0 && thisIndex.y == 0) {
+    
+    if (thisIndex.x == 0 && thisIndex.y == 0 && qindex==0 && bloop == 0) {
       WIN->printparameters();
     }      
     // printf("xy %d %d %f %f %f %f\n", thisIndex.x, thisIndex.y, gpp_eig[0], gpp_eig[130], gpp_omsq[0], gpp_omsq[130]);
     std::vector<double> psi_eig;// shifted state eigenvalues
-    double* _eig_occ = e_occ[is][ikq];
-    double* _eig_unocc = e_unocc[is][ikq];
-    std::copy(_eig_occ, _eig_occ+nocc, back_inserter(psi_eig));
-    std::copy(_eig_unocc, _eig_unocc+nunocc, back_inserter(psi_eig));
+    for (int ik=0; ik < gwbse->gw_parallel.K; ik++) {
+      kqIndex(ik, ikq, umklapp);
+      double* _eig_occ = e_occ[is][ikq];
+      double* _eig_unocc = e_unocc[is][ikq];
+      std::copy(_eig_occ, _eig_occ+nocc, back_inserter(psi_eig));
+      std::copy(_eig_unocc, _eig_unocc+nunocc, back_inserter(psi_eig));
+    }
 
     int state_start_index = 0;
     int state_end_index = nocc;
@@ -530,7 +513,9 @@ void PMatrix::sigma() {
           wpsq = gpp_omsq[ipp];
           wp = sqrt(wpsq);
           // Select w2>0 windows only!
-          // printf("ipp %d wp %f \n", ipp, wp);
+          // if (thisIndex.x == 0 && thisIndex.y == 0 && first) {
+          //   printf("ipp %d wp %f wpsq %f \n", ipp, wp, wpsq);
+          // }
           if (wpsq > 0.0) {
             if (winpair.in_window(wp, window_index, sigma_window_index)) {
               pp_wp.push_back(wp);
@@ -540,7 +525,10 @@ void PMatrix::sigma() {
           ipp++;
         }
       }  // end i_ndata accumulate pp loop
-      
+      // if (thisIndex.x == 0 && thisIndex.y == 0) {
+      //   printf("accepted %d\n", ipp);
+      // }
+      // first = false;
       // Important!
       // We want the denominator to be always negative or positive.
       // In this code it is assumed to be always negative for GL nodes.
@@ -553,8 +541,8 @@ void PMatrix::sigma() {
       //  cubic_sigma_per_window
       //  PerformPPEnergySumThisNode
       //  PerformStateSumThisNode
-      // we use zeta = - winpair.zeta;
-      if (thisIndex.x == 0 && thisIndex.y==0) {
+      //  we use zeta = - winpair.zeta;
+      if (thisIndex.x == 0 && thisIndex.y==0 && state_e.size()>0 && pp_wp.size()>0) {
         printf("Window %f %f %f %f %d %d %d %d \n", winpair.w1[0], winpair.w1[1], winpair.w2[0], winpair.w2[1], winpair.nodes.size(), state_e.size(), pp_wp.size(), ipp);
       }
       
@@ -603,12 +591,9 @@ void PMatrix::sigma() {
             // 7a. Loop over PP moves with energies in window pair
             for (int j = 0; j < Nb; j++) { 
               double omsq_j = gpp_omsq[pp_idx[j]];
-              // if (1) {
               if (omsq_j > 0) {
                 double sigma_j = gpp_eig[pp_idx[j]];
                 double omega_j = sqrt(omsq_j);
-                // double omega_j = 1000000;
-
                 double factor  = sigma_j*omega_j/2.0;
                 // double factor  = sigma_j/2.0;
                 // printf("omega %f pp_wp %f \n", omega_j, pp_wp[j]);
@@ -622,7 +607,7 @@ void PMatrix::sigma() {
                   }  // end if
                 }  // end if
 
-                complex* B_r = psi_cache->get_gpp_eigv(iq, pp_idx[j]);
+                complex* B_r = psi_cache->get_gpp_eigv(pp_idx[j]);
                 // printf("j: %d, inode: %d, B factor: %lf, tau_u: %lf, zeta %lf\n", j, inode, factor, tau_u, zeta);
 #ifdef USE_LAPACK
                 char transformT = 'C';
@@ -632,7 +617,7 @@ void PMatrix::sigma() {
                 // myGEMM( &transform, &transformT, &ndata, &ndata, &this_nocc, &Lalpha, _psis_occ2, &ndata, _psis_occ1, &ndata, &Lbeta, focc, &ndata);
                 myGEMM(&transform, &transformT, &psi_ndata_local, &psi_ndata_local, &Lone,  &factor, B_r, &psi_ndata_local, B_r, &psi_ndata_local, &one, B_m, &psi_ndata_local);
 #else
-              Die("Without -DUSE_LAPACK flag, polarizability calculation does not work!");
+              Die("Without -DUSE_LAPACK flag, N3 sigma calculation does not work!");
 #endif
               }
             }  // end B^p_{rr'}  Eq. 35 (7a)
@@ -675,12 +660,12 @@ void PMatrix::sigma() {
               double beta    = 1.0;
               myGEMM(&transform, &transformT, &psi_ndata_local, &psi_ndata_local, &Lone,  &factor, fr1, &psi_ndata_local, fr1, &psi_ndata_local, &beta, F_m, &psi_ndata_local);
 #else
-              Die("Without -DUSE_LAPACK flag, polarizability calculation does not work!");
+              Die("Without -DUSE_LAPACK flag, N3 sigma calculation does not work!");
 #endif    
               // delete [] psiRkq_i;
               delete [] fr1;
             } // end A^p_{rr'}  Eq. 35 (7b)
-
+            // TODO could be done with lapack
             for (int idata = 0; idata < tile_size; idata++) {
                 sigma_m[idata] += iQuadFactor * F_m[idata] * B_m[idata];
                 // printf("%d %f %f %f %f\n", idata, iQuadFactor, F_m[idata].re*1000000, B_m[idata].re*1000000, sigma_m[idata]*1000000);
@@ -695,21 +680,31 @@ void PMatrix::sigma() {
     // }  // end nq loop (2)
   } // end bloop (1)
   // Now multiply with state vectors <psi^*|Sigma|psi> to get sigma energies
-  // int i = 0;
-  // for (SIGMAINDICES iwn12 : sigma_index_list) {
-  //   for (std::pair<int, int> in12 : iwn12.n12) {
+  FVectorCache* f_cache = fvector_cache_proxy.ckLocalBranch();
+  int n = f_cache->getNSize(); // number of matrix elements
+  int *np_list = gwbse->gw_sigma.np_list_sig_matels;  // matrix elements
+
+  int tuple_size = nkpt*n;
+  tuple_size += 1;
+  CkReduction::tupleElement *tuple_reduction;
+  tuple_reduction = new CkReduction::tupleElement[tuple_size];
+  complex *contrib_data;
+  contrib_data = new complex[tuple_size];
+  complex total_contribution = (0.0,0.0);
+  
+
+
   int itup = 0;
   for (int ik = 0; ik < nkpt; ik++) {
-    for (int l = 0; l < n; l++) {
+    for (int next_state = 0; next_state < n; next_state++) {
       complex contribution(0.0,0.0);
       complex psiRk_n1[psi_ndata_local];
       complex psiRk_n2[psi_ndata_local];
       for (int i=0; i<psi_ndata_local; i++){
-        // psiRk_n1[i] = psi_cache->psis[ik][in12.first][region_ridx*psi_ndata_local + i];
-        // psiRk_n2[i] = psi_cache->psis[ik][in12.second][region_cidx*psi_ndata_local + i];
-        psiRk_n1[i] = psi_cache->psis[ik][l][region_ridx*psi_ndata_local + i];
-        psiRk_n2[i] = psi_cache->psis[ik][l][region_cidx*psi_ndata_local + i];
+        psiRk_n1[i] = psi_cache->psis[ik][np_list[next_state]-1][region_ridx*psi_ndata_local + i];
+        psiRk_n2[i] = psi_cache->psis[ik][np_list[next_state]-1][region_cidx*psi_ndata_local + i];
       }
+#ifdef USE_LAPACK
       char transformT = 'C';
       char transform  = 'N';
       int    Lone   = 1;
@@ -718,25 +713,28 @@ void PMatrix::sigma() {
       complex sigma_n2[tile_size] = {0.0};
       complex n1_sigma_n2[1]  = {0.0};
       myGEMM(&transform,  &transform, &psi_ndata_local, &Lone, &psi_ndata_local, &factor, sigma_m, &psi_ndata_local, psiRk_n2, &psi_ndata_local, &beta, sigma_n2, &psi_ndata_local);
-      // for (int j=0; j < tile_size; j++) {
-      //   printf("%d %f \n", j, sigma_n2[j].re);
-      // }
       myGEMM(&transformT, &transform, &Lone,  &Lone, &psi_ndata_local, &factor, psiRk_n1, &psi_ndata_local, sigma_n2, &psi_ndata_local, &beta, n1_sigma_n2, &Lone);
       contribution = n1_sigma_n2[0];
+#else
+      Die("Without -DUSE_LAPACK flag, N3 Sigma calculation does not work!");
+#endif    
       contrib_data[itup] = contribution;
-      tuple_reduction[itup] =  CkReduction::tupleElement(sizeof(complex), &(contrib_data[ik]), CkReduction::sum_double);
+      tuple_reduction[itup] = CkReduction::tupleElement(sizeof(complex), &(contrib_data[itup]), CkReduction::sum_double);
+      // if (thisIndex.x == 0 && thisIndex.y==0) {
+      //   printf("SIGMA %f %f %d %d %d\n", total_contribution.re, contribution.re, ik, l, itup);
+      // }
       itup++;
       total_contribution += contribution;
-      // printf("SIGMA %f %f %d %d \n", total_contribution.re, contribution.re, ik, l);
     }
   }
-  
-  // tuple_reduction[itup] =  CkReduction::tupleElement(sizeof(complex), &total_contribution, CkReduction::sum_double);
-  // CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tuple_reduction, tuple_size);
-  // msg->setCallback(CkCallback(CkIndex_Controller::sigma_n3_complete(NULL), controller_proxy));
-  // contribute(msg);
-  // delete[] contrib_data;
-  contribute(CkCallback(CkReductionTarget(Controller, sigma_n3_complete), controller_proxy));
+  // if (thisIndex.x == 0 && thisIndex.y==0) {
+  //   printf("SIGMA %f %f %d\n", total_contribution.re, total_contribution.im, itup);
+  // }
+  tuple_reduction[itup] =  CkReduction::tupleElement(sizeof(complex), &total_contribution, CkReduction::sum_double);
+  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tuple_reduction, tuple_size);
+  msg->setCallback(CkCallback(CkIndex_Controller::sigma_n3_complete(NULL), controller_proxy));
+  contribute(msg);
+  delete[] contrib_data;
 }
 
 void PMatrix::compute_fr(complex* fr, complex* psikq, const int uklpp[3]){
