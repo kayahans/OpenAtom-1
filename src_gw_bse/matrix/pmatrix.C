@@ -526,11 +526,11 @@ void PMatrix::sigma() {
           const double wp_min       = winpair.w2[0];
           
           if (bIsHGL) {
-            iQuadFactor = w_u * winpair.gamma;  // MJ used -gamma here, check why and how it differs from zeta
+            iQuadFactor = 1./nkpt * w_u * winpair.gamma;  // MJ used -gamma here, check why and how it differs from zeta
             hgl_loops = 2;
             bIsFirstLoop = true;
           } else {
-            iQuadFactor = w_u * zeta * exp(-tau_u*(gap*zeta - 1.0));
+            iQuadFactor = 1./nkpt * w_u * zeta * exp(-tau_u*(gap*zeta - 1.0));
             hgl_loops = 1;
             bIsFirstLoop = false;
           }
@@ -622,19 +622,17 @@ void PMatrix::sigma() {
                 F_m = new complex[tile_size]; // gpp rr' tile
                 // 6b. Calculate A for at all k 
                 for (int i_s = 0; i_s < state_e.size(); i_s++) {
-                  complex* psiRkq_i = new complex[psi_ndata_local];
-                  complex *fr1 = new complex[psi_ndata_local]; //rho-bar matrix
+                  complex* fr1 = new complex[psi_ndata_local]; //rho-bar matrix
+                  complex* fr2 = new complex[psi_ndata_local]; //rho-bar matrix                  
                   for (int idx=0; idx<psi_ndata_local; idx++){
-                    psiRkq_i[idx] = psi_cache->psis[ikq][state_idx[i_s]][thisIndex.x*psi_ndata_local+idx];
-                    fr1[idx] = psi_cache->psis[ikq][state_idx[i_s]][thisIndex.y*psi_ndata_local+idx];
+                    fr1[idx] =  psi_cache->psis[ikq][state_idx[i_s]][thisIndex.x*psi_ndata_local+idx];
+                    fr2[idx] = psi_cache->psis[ikq][state_idx[i_s]][thisIndex.y*psi_ndata_local+idx];
                   }
-                  
-                  // TODO later
-                  // Need to modify psikq if umklapp vector is not zero
-                  // if( uklpp[0]!=0 || uklpp[1]!=0 || uklpp[2]!=0 ){
-                  //   complex* psikq_tmp[tile_size];
-                  //   // TODO modify_state_Uproc(fr, uklpp, nfft, sys);
-                  // }
+                  bool row = true;
+                  if( umklapp[0]!=0 || umklapp[1]!=0 || umklapp[2]!=0 ){
+                    modify_state_Uproc(fr1, umklapp, row);
+                    modify_state_Uproc(fr2, umklapp, !row);
+                  }
 
                   double factor;
                   if (!bIsHGL) {
@@ -654,12 +652,12 @@ void PMatrix::sigma() {
                   char transform  = 'N';
                   int Lone        = 1;
                   double beta    = 1.0;
-                  myGEMM(&transform, &transformT, &psi_ndata_local, &psi_ndata_local, &Lone,  &factor, fr1, &psi_ndata_local, fr1, &psi_ndata_local, &beta, F_m, &psi_ndata_local);
+                  myGEMM(&transform, &transformT, &psi_ndata_local, &psi_ndata_local, &Lone,  &factor, fr1, &psi_ndata_local, fr2, &psi_ndata_local, &beta, F_m, &psi_ndata_local);
     #else
                   Die("Without -DUSE_LAPACK flag, N3 sigma calculation does not work!");
     #endif    
-                  delete [] psiRkq_i;
                   delete [] fr1;
+                  delete [] fr2;
                 } // end A^p_{rr'}  Eq. 35 (6b)
                 // if (thisIndex.x == 0 && thisIndex.y==0 && state_e.size()>0 && pp_wp.size()>0 && ik == 0 && inode == 0) {
                 //   printf("B_m[0] %f %f\n", B_m[0].re, B_m[0].im);
@@ -720,17 +718,69 @@ delete[] contrib_data;
 
 } // end void PMatrix::sigma()
 
-void PMatrix::compute_fr(complex* fr, complex* psikq, const int uklpp[3]){
-  // set f_r
-  for(int i=0; i<tile_size; i++){
-      fr[i] = psikq[i];
-  }
-  // Need to modify psikq if umklapp vector is not zero
-  if( uklpp[0]!=0 || uklpp[1]!=0 || uklpp[2]!=0 ){
-    complex* psikq_tmp[tile_size];
-    // TODO modify_state_Uproc(fr, uklpp, nfft, sys);
-  }
-}
+void PMatrix::modify_state_Uproc(complex* a_v, const int uklpp[3], bool row) {
+    int* nfft;
+    GWBSE *gwbse = GWBSE::get();
+    nfft = gwbse->gw_parallel.fft_nelems;
+    int ndata = nfft[0]*nfft[1]*nfft[2];
+    double *a1, *a2, *a3, *b1, *b2, *b3;
+    a1 = gwbse->gwbseopts.a1;
+    a2 = gwbse->gwbseopts.a2;
+    a3 = gwbse->gwbseopts.a3;
+    b1 = gwbse->gwbseopts.b1;
+    b2 = gwbse->gwbseopts.b2;
+    b3 = gwbse->gwbseopts.b3;
+    double lattconst = gwbse->gwbseopts.latt;
+        
+    double rijk, G0, phase;
+    complex fact;
+    int icount = 0;
+
+    
+    int start_tile;
+    if (row)
+      start_tile = thisIndex.x;
+    else
+      start_tile = thisIndex.y;
+    int start_x = start_tile * psi_ndata_local;
+
+    int dim_y = nfft[1] * nfft[2];
+    int dim_z = nfft[2];
+    for (int i = 0; i < psi_ndata_local; i++) {
+      int glob_idx = i + start_x;
+      int xi = i / dim_y;
+      int yi = (i - xi * dim_y)/dim_z;
+      int zi = i % dim_z;
+      phase = 0;
+      fact = 0;
+      for (int ii = 0; ii < 3; ii++) {
+        rijk = a1[ii]*xi/nfft[0] + a2[ii]*yi/nfft[1] + a3[ii]*zi/nfft[2];
+        G0 = b1[ii]*uklpp[0] + b2[ii]*uklpp[1] + b3[ii]*uklpp[2];
+        G0 *= -2*M_PI/lattconst;
+        phase += rijk*G0;
+      }
+      fact.re = cos(phase);
+      fact.im = sin(phase);
+      a_v[i] *= fact;
+    }
+
+    // Print out error message, but don't die
+    if ( ndata != icount ) {
+        printf("Something went wrong when Umklapp vector is applied");
+    }
+}  // end modify_state_Uproc
+
+// void PMatrix::compute_fr(complex* fr, complex* psikq, const int uklpp[3]){
+//   // set f_r
+//   for(int i=0; i<tile_size; i++){
+//       fr[i] = psikq[i];
+//   }
+//   // Need to modify psikq if umklapp vector is not zero
+//   if( uklpp[0]!=0 || uklpp[1]!=0 || uklpp[2]!=0 ){
+//     complex* psikq_tmp[tile_size];
+//     // TODO modify_state_Uproc(fr, uklpp, nfft, sys);
+//   }
+// }
 
 
 void PMatrix::generateEpsilon(CProxy_EpsMatrix proxy, std::vector<int> accept){

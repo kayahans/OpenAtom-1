@@ -61,7 +61,8 @@ class PMatrix : public CBase_PMatrix {
     void kqIndex(unsigned, unsigned&, int*);
     complex* umklapp_factor;
     void getUmklappFactor(complex*, int[3]);
-    void compute_fr(complex* fr, complex* psikq, const int uklpp[3]);
+    // void compute_fr(complex* fr, complex* psikq, const int uklpp[3]);
+    void modify_state_Uproc(complex* a_v, const int uklpp[3], bool row);
     double total_time;
 };
 
