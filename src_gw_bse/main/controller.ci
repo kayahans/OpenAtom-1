@@ -194,11 +194,11 @@ module controller {
               states_proxy(0, next_K, next_state).sendToCache();
             }
           }
-          // for (next_K = 0; next_K < K; next_K++) {
-          //   for (next_state = L; next_state < L+M; next_state++) {
-          //     states_proxy(0, next_K, next_state).sendToCache();
-          //   }
-          // }
+          for (next_K = 0; next_K < K; next_K++) {
+            for (next_state = L; next_state < L+M; next_state++) {
+              states_proxy(0, next_K, next_state).sendToCache();
+            }
+          }
         }
         when fCacheReady(), cachesFilled(), registrationComplete() serial {
           psi_cache_proxy.reportInfo();
@@ -514,6 +514,7 @@ module controller {
             CkPrintf("| Bare Exchange     | %d | %d | %d | %lf + %fi\t|\n", k, n_list[ib], np_list[ib], dx.re*27.2114,dx.im);
             CkPrintf("|                   |   |   |   |                         \n");
           }
+          CkPrintf("-----------------------------------------------------------------\n");
         }
         delete msg;
         if (sigma_mode == 0) 
@@ -570,7 +571,6 @@ module controller {
         // if screenedExchange is skipped (above), then it does nothing, hence cohComplete is 
         // never satisfied. 
         when sigma_n3_complete(CkReductionMsg* msg) serial{
-          CkPrintf("Completed\n");
           CkReduction::tupleElement* results = NULL;
           int num_reductions = 0;
           msg->toTuple(&results, &num_reductions);
@@ -579,9 +579,10 @@ module controller {
             for(int ib=0;ib<Bands;ib++){
               complex dx = *(complex*)results[ik++].data;
               sigma_final[k][ib] += dx;
+              CkPrintf("-----------------------------------------------------------------\n");
               CkPrintf("| Sigma             | %d | %d | %d | %11.8f + %fi\t|\n", k, n_list[ib], np_list[ib], dx.re*27.2114, dx.im);
               CkPrintf("|                   |   |   |   |                         \n");
-              CkPrintf("-----------------------------------------------------------------\n");
+              
             }
           }
           complex dx = *(complex*)results[ik].data;
@@ -800,37 +801,18 @@ module controller {
         serial {
           STOP_STEP("GPP OMSQ")
           START_STEP("GPP Transferred to PsiCache")
-          START_STEP("GPP copy 1d")
           matrixCopy(gpp2D_proxy, gpp1D_proxy, copyCB);
-        }
-        // For now, all eigenvectors and values are distributed to all PsiCache
-        when copyComplete(bool success) serial {
-          STOP_STEP("GPP copy 1d")
-          START_STEP("GPP init psicache")
           psi_cache_proxy.init_gpp_cache(qindex);
         }
-        when gpp_psi_cache_ready() serial {
+        // For now, all eigenvectors and values are distributed to all PsiCache
+        when copyComplete(bool success), gpp_psi_cache_ready() serial {
           // Eigenvectors are sent after matrices are row decomposed from 1D object
-          // STOP_STEP("GPP init psicache")
-          // START_STEP("GPP send v")
           gpp1D_proxy.sendToCacheV(real_epsilon_size);
-        }
-        when gppVCachesFilled() serial {
           // Eigenvalues and omsq (below) are sent from a tile column of 2D object
-          // STOP_STEP("GPP send v")
-          // START_STEP("GPP send e")
           gpp2D_proxy.sendToCacheE(real_epsilon_size);
-        }
-        when gppECachesFilled() serial {
-          // STOP_STEP("GPP send e")
-          // START_STEP("GPP send o")
           gpp2D_proxy.sendToCacheO(real_epsilon_size);
         }
-        when gppOCachesFilled() serial {
-          // STOP_STEP("GPP send o")
-        //   psi_cache_proxy.reset_gpp_counters(); 
-        // }
-        // when gpp_counters_reset() serial {
+        when gppVCachesFilled(), gppECachesFilled(), gppOCachesFilled() serial {
           STOP_STEP("GPP Transferred to PsiCache")
           STOP_BIG_STEP("GPP FORMED");
           thisProxy.GppFormed();

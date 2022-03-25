@@ -67,17 +67,32 @@ void States::sendToCache() {
   //CkPrintf("[%i,%i,%i]: Sending psi to node cache...\n", ispin, ikpt, istate);
   int ndata = nfft[0]*nfft[1]*nfft[2];
   PsiMessage* msg;
-  bool n3 = false;
+  bool n3 = true;
   if (n3) {
-    if(istate >= nocc) {
-        msg = new (ndata) PsiMessage(ndata, stateCoeffR);
-        msg->spin_index = ispin;
-        msg->k_index = ikpt;
-        msg->state_index = istate;
-        msg->shifted = false;
-        psi_cache_proxy.receivePsi(msg);
-    }
-    if(qindex == 0 && istate < nocc){ //Shifted states - i think
+    // if(istate >= nocc) {
+    //     msg = new (ndata) PsiMessage(ndata, stateCoeffR);
+    //     msg->spin_index = ispin;
+    //     msg->k_index = ikpt;
+    //     msg->state_index = istate;
+    //     msg->shifted = false;
+    //     psi_cache_proxy.receivePsi(msg);
+    // }
+    // if(qindex == 0 && istate < nocc){ //Shifted states - i think
+    //   msg = new (ndata) PsiMessage(ndata, stateCoeffR_shifted);
+    //   msg->spin_index = ispin;
+    //   msg->k_index = ikpt;
+    //   msg->state_index = istate;
+    //   msg->shifted = true;
+    //   psi_cache_proxy.receivePsi(msg);
+    // }
+    msg = new (ndata) PsiMessage(ndata, stateCoeffR);
+    msg->spin_index = ispin;
+    msg->k_index = ikpt;
+    msg->state_index = istate;
+    msg->shifted = false;
+    psi_cache_proxy.receivePsi(msg);
+
+    if(qindex == 0 && istate < nocc){
       msg = new (ndata) PsiMessage(ndata, stateCoeffR_shifted);
       msg->spin_index = ispin;
       msg->k_index = ikpt;

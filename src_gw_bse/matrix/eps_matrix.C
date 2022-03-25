@@ -176,9 +176,9 @@ void EpsMatrix::bareExchange() {
   contrib_data = new complex[tuple_size];
   int ik = 0;
   std::vector<double> vcoulb = psi_cache->getVCoulb();
-  if (thisIndex.x == 0 && thisIndex.y==0) {
-    printf("bareExchange size %d \n", tuple_size);
-  }
+  // if (thisIndex.x == 0 && thisIndex.y==0) {
+  //   printf("bareExchange size %d \n", tuple_size);
+  // }
   
   if(qindex==0)
     vcoulb[0] = psi_cache->getVCoulb0();

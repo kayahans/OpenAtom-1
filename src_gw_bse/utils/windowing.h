@@ -121,6 +121,7 @@ class WINDOWING {
   void printparameters() const;
   void searchwins(char*);
   void from_input(std::vector<double>, std::vector<double>);
+  double get_omega();
 
  private:
   // Available options

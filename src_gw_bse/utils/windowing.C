@@ -192,7 +192,7 @@ void WINDOWING::initialize(double*** e_occ, double*** e_unocc, int _nocc, int _n
     nq      = _nkpt;  // FIXME
     nkpt    = _nkpt;
     double _eV       = 1./27.2114;
-    ptol            = 0.1;                  // (hard coded)
+    ptol            = 1;                  // (hard coded)
     errfrac         = ptol/100;             // Percent tolerance converted to errfrac
     min_gap         = 0.1*_eV;              // (hard coded) Minimum gap to be considered metallic (0.1 eV)
     max_windows[0]  = 5;                    // (hard coded)
@@ -272,6 +272,7 @@ void WINDOWING::initialize(double*** e_occ, double*** e_unocc, int _nocc, int _n
  */
 void WINDOWING::sigma_win(const double _w, double* const omsq, int const ng) {
     omega = _w;
+    // printf("omega sigmawin %f\n", omega);
     std::vector<double> _wppsq;
     // for (int is = 0; is < nspin; is++) {
     //     for (int iq = 0; iq < nq; iq++) {
@@ -610,6 +611,7 @@ double WINDOWING::win_Sigma_cost(int New, int Npw, std::vector<double> (&eawins)
   double cost = 1E9;
   double new_cost;
   opt_option = "read_dos";
+  // printf("omega %f\n", omega);
   for (int Nvw = 1; Nvw < New; Nvw++) {
     new_cost = 0;
     Ncw = New - Nvw;  // Number of conduction band windows are implicitly defined
@@ -854,6 +856,10 @@ double WINDOWING::hgl_quad_cost(double ab_bw) {
 
     double nq = c2*pow(ab_bw, 2) + c1*ab_bw + c0;
     return floor(nq);  // (kayahans) Ceil would be fail safe but floor is good enough
+}
+
+double WINDOWING::get_omega() {
+    return omega; 
 }
 
 // void WINDOWING::from_input(std::vector<double> wa, std::vector<double> wb) {

@@ -181,6 +181,7 @@ PsiCache::PsiCache() {
       psis[k][l] = new complex[psi_size];
     }
   }
+
   // shifted k grid psis. Need this for qindex=0
   psis_shifted = new complex**[K];
   for (int k = 0; k < K; k++) {
@@ -193,7 +194,7 @@ PsiCache::PsiCache() {
   nfft = gwbse->gw_parallel.fft_nelems;
 
   int ndata = nfft[0]*nfft[1]*nfft[2];  
-  // 02.02.2022 Kayahan added GPP rhoData, stored at every node FFT in place
+  // 02.02.2022 Kayahan added GPP rhoData, stored at every node
   int sigma_mode = gw_sigma->sigma_mode;
   if (sigma_mode == 1) {
     ndata_rho = gw_sigma->ndata_rho;
@@ -275,10 +276,11 @@ complex* PsiCache::get_gpp_eigv(int alpha) {
 }
 
 void PsiCache::calculate_windows() {
-  int w = 0.23;
-  char calc[] = "Sigma";
+  double w = 0.23;
+  char sigma[] = "Sigma";
   WIN->sigma_win(w, gpp_omsq, ng);
-  WIN->searchwins(calc); // on the fly windowing optimization
+  WIN->searchwins(sigma); // on the fly windowing optimization
+  // printf("Sigma windowing optimized\n");
   contribute(CkCallback(CkReductionTarget(Controller,gpp_windows_ready), controller_proxy));
 }
 
@@ -291,7 +293,7 @@ WINDOWING *PsiCache::getWin() {
 }
 
 void PsiCache::setQIndex(int q_index){
-
+  states_received = 0;
   qindex = q_index;
   received_psis = 0;
   received_chunks = 0;
@@ -343,16 +345,20 @@ void PsiCache::receivePsi(PsiMessage* msg) {
   if (msg->spin_index != 0) {
     CkAbort("Error: We don't support multiple spins yet!\n");
   }
-  bool n3 = false;
+  bool n3 = true;
+
   CkAssert(msg->k_index < K);
   CkAssert(msg->size == psi_size);
   if (n3) {
+    int total_states = (2*L+M)*K;
+    if (qindex > 0)
+      total_states = (L+M)*K;
     if(msg->shifted==false){std::copy(msg->psi, msg->psi+psi_size, psis[msg->k_index][msg->state_index]);}
-      if(msg->shifted==true){std::copy(msg->psi, msg->psi+psi_size, psis[msg->k_index][msg->state_index]);}
+    if(msg->shifted==true){std::copy(msg->psi, msg->psi+psi_size, psis_shifted[msg->k_index][msg->state_index]);}
     fflush(stdout);
     states_received++;
-    // printf("recv %d target %d\n", states_received, (L+M)*K);
-    if(states_received == (L+M)*K) {
+    // printf("recv %d target %d\n", states_received, total_states);
+    if(states_received == total_states) {
       contribute(CkCallback(CkReductionTarget(Controller,cachesFilled), controller_proxy));
       delete msg;
     }
