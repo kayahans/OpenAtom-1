@@ -806,5 +806,4 @@ void DiagBridge::prepareData(int qindex, int eps_size, int num_qpts) {
 }
 
 
-
 #include "eps_matrix.def.h"

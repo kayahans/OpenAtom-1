@@ -394,10 +394,11 @@ void PsiCache::receiveGppV(GppVMessage* msg) {
   gppv_received++;
   // for (int i = 0; i < size; i++) {
   //   gpp_eigv[msg->q_index][msg->alpha_idx][i] = msg->eigv[i];
-  // }
-  if(gppv_received == size) {
-    // printf("GPPV %u %u %u %d\n", msg->q_index, msg->alpha_idx, msg->size, gppv_received);
-    // printf("receiveGppv %f %f %d %d\n", gpp_eigv[0][1][0].re, gpp_eigv[0][1][130].re, size, gppv_received);
+  // } 
+  // printf("GPPV %u %u %u %d\n", msg->q_index, msg->alpha_idx, msg->size, gppv_received);
+  if(gppv_received == msg->tot_alpha) {
+    
+    // printf("receiveGppv %.12f %.12f %d %d %d\n", gpp_eigv[0][1].re, gpp_eigv[0][size-1].re, size, gppv_received, msg->alpha_idx);
     contribute(CkCallback(CkReductionTarget(Controller,gppVCachesFilled), controller_proxy));
     delete msg;    
   }
@@ -441,12 +442,7 @@ void PsiCache::receiveGppO(GppEMessage* msg) {
   // CkAssert(msg->size == ng);
   int size = msg->size;
   int start_idx = msg->start_idx;  
-  // std::copy(msg->eigv, msg->eigv+ng, gpp_eigv[msg->q_index][msg->alpha_idx]);
-  
-  
-  // fflush(stdout);
   gppo_received++;
-  // int num_nodes = CkNumNodes();
 
   for (int i = 0; i < size; i++) {
     gpp_omsq[start_idx+i] = msg->eige[i];
@@ -819,13 +815,17 @@ void PsiCache::setVCoulb(std::vector<double> vcoulb_in, double vcoulb0, std::vec
 
 void PsiCache::init_gpp_cache(int qindex) {
   GWBSE* gwbse = GWBSE::get();
+  int* nfft;
+  nfft = gwbse->gw_parallel.fft_nelems;
+  int ndata = nfft[0]*nfft[1]*nfft[2];
   int num_q = gwbse->gw_parallel.n_qpt;  
   int num_alpha = ng; // TODO num alpha can be less than ng
   if (qindex > 0) {
     // TODO Ideally if we knew the largest ng, then we can allocate this memory once and bookkeep
     delete[] gpp_eige;
     delete[] gpp_omsq;
-    for (int i = 0; i < ng_prev; i++) {
+    // for (int i = 0; i < ng_prev; i++) {
+    for (int i = 0; i < ng_prev; i++) {      
       delete[] gpp_eigv[i];
     }
     delete[] gpp_eigv;
@@ -833,7 +833,7 @@ void PsiCache::init_gpp_cache(int qindex) {
 
   gpp_eigv = new complex*[num_alpha];
   for (int ia = 0; ia < num_alpha; ia++) {
-    gpp_eigv[ia] = new complex [ng];
+    gpp_eigv[ia] = new complex [ndata];
   }
   gpp_eige = new double[ng];
   gpp_omsq = new double[ng];
@@ -841,7 +841,8 @@ void PsiCache::init_gpp_cache(int qindex) {
   gppv_received = 0;
   gppo_received = 0;
 
-  ng_prev = ng;
+  ng_prev = num_alpha;
+  // printf("Allocated %d %d %d\n", ndata, num_alpha, qindex);
   contribute(CkCallback(CkReductionTarget(Controller,gpp_psi_cache_ready), controller_proxy));
 }
 

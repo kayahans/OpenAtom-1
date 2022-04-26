@@ -58,6 +58,7 @@ class EpsMatrix : public CBase_EpsMatrix {
     void coh();
     void coh_skipped();
     void scalar_multiply(double alpha);
+    
     void convergence_check(CProxy_EpsMatrix cmp_proxy);
     void add_compl_two();
     void multiply_coulb();

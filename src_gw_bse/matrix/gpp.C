@@ -182,18 +182,24 @@ void Gpp::calculate_vc() {
   vcoulb = new double [ng];
   std::copy(vcoulbp.begin(), vcoulbp.end(), vcoulb);
   if(qindex==0)
-      vcoulb[0] = psi_cache->getVCoulb0();  
+      vcoulb[0] = psi_cache->getVCoulb0();
   
   // omsq values are stored only on the diagonal tiles
   if (thisIndex.x == thisIndex.y) {
     omsq = new double [eps_cols];
   }
+  // if (thisIndex.x==0 and thisIndex.y==0) {
+  //   for (int i=0; i < ng; i++) {
+  //     printf("%d %f\n", i, vcoulb[i]);
+  //   }
+  // }
+  // CkExit(0);
   // eigval = new double [ng];
   contribute(CkCallback(CkReductionTarget(Controller, gpp_vc_complete), controller_proxy));
   // Check for garbage collector?
 }
 
-void Gpp::RtoG(int qindex) {
+void Gpp::fft_RtoG(int qindex) {
 
   if (thisIndex.x == 0 && thisIndex.y == 0) {
     FFTController* fft_controller = fft_controller_proxy.ckLocalBranch();
@@ -240,8 +246,224 @@ void Gpp::RtoG(int qindex) {
   // // contribute(CkCallback(CkReductionTarget(Controller, gpp_fft_complete), controller_proxy));
 }
 
-void Gpp::RtoG_skip() {
-  contribute(CkCallback(CkReductionTarget(Controller, RtoG_skipped), controller_proxy));
+void Gpp::ifft_GtoR(int qindex, int real_epsilon_size, std::vector<int> accept) {
+  if (config.chareCols() != 1) {
+    CkAbort("FFT not supported for 2D decompositions\n");
+  }
+  // After the GPP eigenvalues are 1D decomposed in G-space
+  // Do FFT from G to R space on each eigenvector
+
+  GWBSE *gwbse = GWBSE::get();
+  FFTController* fft_controller = fft_controller_proxy.ckLocalBranch();
+  FVectorCache* f_cache = fvector_cache_proxy.ckLocalBranch();
+  int* nfft;
+  nfft = gwbse->gw_parallel.fft_nelems;
+  int ndata = nfft[0]*nfft[1]*nfft[2];
+  int backward = 1;
+  int numCoeff = real_epsilon_size;
+
+  // First set up the data structures in the FFTController
+  fft_controller->setup_fftw_3d(nfft, backward);
+  fftw_complex* in_pointer = fft_controller->get_in_pointer();
+  fftw_complex* out_pointer = fft_controller->get_out_pointer();
+
+  // we need to setup fftidx
+  int *g[3]; // put_into_fftbox routine takes 2D g array, so we need to do this
+  std::vector<int> geps_x = f_cache->getGepsXVector();
+  std::vector<int> geps_y = f_cache->getGepsYVector();
+  std::vector<int> geps_z = f_cache->getGepsZVector();
+
+  int *ga = new int[real_epsilon_size];
+  int *gb = new int[real_epsilon_size];
+  int *gc = new int[real_epsilon_size];
+  for (int i = 0; i < real_epsilon_size; i++) {
+    ga[i] = geps_x[i];
+    gb[i] = geps_y[i];
+    gc[i] = geps_z[i];
+  }
+  g[0] = ga;
+  g[1] = gb;
+  g[2] = gc;
+  // if (thisIndex.x == 0 && thisIndex.y == 0) {
+  //   // for (int i=0; i<real_epsilon_size; i++)
+  //   int i = 0;
+  //   printf("rhop %d %f %f \n", i, data[i].re, data[i].re * data[i].re + data[i].im * data[i].im);
+  //   i = real_epsilon_size - 1;
+  //   printf("rhop %d %f %f \n", i, data[i].re, data[i].re * data[i].re + data[i].im * data[i].im);
+  // }
+  
+  int **fftidx;
+  fftidx = new int *[numCoeff];
+  for(int i=0; i<numCoeff;i++){ fftidx[i] = new int [3]; }
+
+  // this routine changes negative g index to be a positive numbers
+  // since it is origianlly written with Fortran, fftidx has fortran counting,
+  // i.e., if gidx is (0,0,0), then (1,1,1) in fftidx
+  gidx_to_fftidx(numCoeff, g, nfft, fftidx);
+  B_r = new complex [ndata];
+  
+  // int gidx = 0;
+  // for (int inr=0; inr < ndata; inr++) {
+  //   B_r[inr] = (0, 0);
+  //   if (accept[inr]) {
+  //     B_r[gidx] = data[gidx];
+  //     gidx++;
+  //   }
+  // }
+  // if (thisIndex.x==0) {
+  //   for (int i = 0; i < numCoeff; i++) {
+  //     data[i].re = 1.0;
+  //     data[i].im = 0.0;
+  //     // printf("input %d %f %f\n", i, data[i].re, data[i].im);
+  //   } 
+  //   // for (int i = 0; i < numCoeff; i++) {
+  //   //   printf("idx %d %d %d %d\n", i, fftidx[i][0], fftidx[i][1], fftidx[i][2]);
+  //   // } 
+  // }  
+  // state coefficients are copied to in_pointer
+  // put_into_fftbox was originally written for doublePack = 0 (false)
+  // double pack is hard coded. FIXME
+  bool doublePack = false;
+  put_into_fftbox(numCoeff, data, fftidx, nfft, in_pointer, doublePack);
+  fft_controller->do_fftw();
+  // if (thisIndex.x == 0 && thisIndex.y == 0) {
+  //   for (int i=0; i<ndata; i++)
+  //     printf("rho %d %.10f \n", i, in_pointer[i][0]);
+  //   // i = real_epsilon_size-1;
+  //   // printf("rho %d %.10f %.10f \n", i, data[i].re, in_pointer[i][0]);
+  // }  
+
+  // CkExit(1);
+  // delete[] data;
+  // data = new complex[ndata];
+  
+  double scale = 1.0; // sqrt(1.0/double(ndata)); // IFFT requires normalization?
+  fftbox_to_array(ndata, out_pointer, B_r, scale);
+  // if (thisIndex.x == 0 && thisIndex.y == 0) {
+  //   // for (int i=0; i<ndata; i++)
+  //   int i =0;
+  //   printf("rho %d %.10f %.10f \n", i, B_r[i].re, out_pointer[i][0]);
+  //   i = ndata-1;
+  //   printf("rho %d %.10f %.10f \n", i, B_r[i].re, out_pointer[i][0]);
+  // }
+  // delete[] ga;
+  // delete[] gb;
+  // delete[] gc;
+  // if (thisIndex.x==0) {
+  //   for (int i = 0; i < ndata; i++) {
+  //     printf("output %d %f %f\n", i, B_r[i].re, B_r[i].im);
+  //   } 
+  // }  
+  for(int i=0; i<numCoeff;i++)
+    delete[] fftidx[i];
+  
+  delete[] fftidx;
+  // printf("%d %d %d\n", thisIndex.x, thisIndex.y, ndata);
+  contribute(CkCallback(CkReductionTarget(Controller, gpp_ifft_complete), controller_proxy));
+}
+
+// void Gpp::ifft_GtoR(int qindex, int real_epsilon_size, std::vector<int> accept) {
+//   if (config.chareCols() != 1) {
+//     CkAbort("FFT not supported for 2D decompositions\n");
+//   }
+//   // After the GPP eigenvalues are 1D decomposed in G-space
+//   // Do FFT from G to R space on each eigenvector
+
+//   GWBSE *gwbse = GWBSE::get();
+//   FFTController* fft_controller = fft_controller_proxy.ckLocalBranch();
+//   FVectorCache* f_cache = fvector_cache_proxy.ckLocalBranch();
+//   int* nfft;
+//   nfft = gwbse->gw_parallel.fft_nelems;
+//   int ndata = nfft[0]*nfft[1]*nfft[2];
+//   int ng = real_epsilon_size;
+//   int forward = -1;
+//   B_r = new complex [ndata];
+//   int gidx = 0;
+//   for (int inr=0; inr < ndata; inr++) {
+//     // B_r[inr] = (0, inr*1.0/10);
+//     if (accept[inr]) {
+//       B_r[gidx] = data[gidx];
+//       gidx++;
+//     }
+//   }
+
+//   // First set up the data structures in the FFTController
+//   fft_controller->setup_fftw_3d(nfft, forward);
+//   fftw_complex* in_pointer = fft_controller->get_in_pointer();
+//   fftw_complex* out_pointer = fft_controller->get_out_pointer();
+
+//   // we need to setup fftidx
+//   int *g[3]; // put_into_fftbox routine takes 2D g array, so we need to do this
+//   std::vector<int> geps_x = f_cache->getGepsXVector();
+//   std::vector<int> geps_y = f_cache->getGepsYVector();
+//   std::vector<int> geps_z = f_cache->getGepsZVector();
+
+//   int **ag;
+//   ag = new int *[ng];
+//   for (int ig=0; ig < ng; ig++)  {
+//     ag[ig] = new int[3];
+//     ag[ig][0] = geps_x[ig];
+//     ag[ig][1] = geps_y[ig];
+//     ag[ig][2] = geps_z[ig];
+//     printf("%d %d %d %d\n", ig, ag[ig][0], ag[ig][1], ag[ig][2]);
+//   }
+//   int **fftidx;
+//   fftidx = new int *[ng];
+//   for (int ig=0; ig < ng; ig++) {
+//     fftidx[ig] = new int[3];
+//   }
+//   gidx_to_fftidx(ng, ag, nfft, fftidx);
+
+//   if (thisIndex.x==0) {
+//     for (int i = 0; i < ng; i++) {
+//       printf("input %d %f %f\n", i, data[i].re, data[i].im);
+//     } 
+//   }
+//   // printf("acceptsize %d\n", accept.size());
+//   bool doublePack = false;
+//   put_into_fftbox(ng, B_r, fftidx, nfft, in_pointer, doublePack);
+//   fft_controller->do_fftw();
+//   // if (thisIndex.x == 0 && thisIndex.y == 0) {
+//   //   // for (int i=0; i<ndata; i++)
+//   //   int i =0;
+//   //   printf("rho1 %d %.10f %.10f \n", i, data[i].re, in_pointer[i][0]);
+//   //   i = real_epsilon_size-1;
+//   //   printf("rho %d %.10f %.10f \n", i, data[i].re, in_pointer[i][0]);
+//   // }  
+//   // delete[] data;
+//   // data = new complex[ndata];
+  
+//   double scale = 1.0; // sqrt(1.0/double(ndata)); // IFFT requires normalization?
+//   fftbox_to_array(ndata, out_pointer, B_r, scale);
+//   // if (thisIndex.x == 0 && thisIndex.y == 0) {
+//   //   // for (int i=0; i<ndata; i++)
+//   //   int i =0;
+//   //   printf("rho %d %.10f %.10f \n", i, B_r[i].re, out_pointer[i][0]);
+//   //   i = ndata-1;
+//   //   printf("rho %d %.10f %.10f \n", i, B_r[i].re, out_pointer[i][0]);
+//   // }
+//   // delete[] ga;
+//   // delete[] gb;
+//   // delete[] gc;
+//   // if (thisIndex.x==0) {
+//   //   int vsum = 0;
+//   //   for (int i = 0; i < ndata; i++) {
+//   //     printf("output %d %f %f %d\n", i, B_r[i].re, B_r[i].im, accept[i]);
+//   //     vsum += accept[i];
+//   //   } 
+//   //   printf("vsum %d\n", vsum);
+//   // }  
+//   for(int i=0; i<ng;i++)
+//     delete[] fftidx[i];
+  
+//   delete[] fftidx;
+  
+//   contribute(CkCallback(CkReductionTarget(Controller, gpp_ifft_complete), controller_proxy));
+// }
+
+
+void Gpp::fft_skip() {
+  contribute(CkCallback(CkReductionTarget(Controller, fft_skipped), controller_proxy));
 }
 
 
@@ -276,7 +498,12 @@ void Gpp::calc_M0() {
   
   if(qindex==0)
       vcoulb[0] = psi_cache->getVCoulb0(); 
-  
+  // if (thisIndex.x==0 and thisIndex.y==0) {
+  //   for (int i=0; i < ng; i++) {
+  //     printf("%d %f\n", i, vcoulb[i]);
+  //   }
+  // }
+  // CkExit(0);
   complex* rhoData = psi_cache->getRhoData();
   int* nr = psi_cache->getRhosize();
   int nrsize = nr[0] * nr[1] * nr[2];
@@ -358,6 +585,8 @@ void Gpp::calc_M0() {
         if (dp11 < 1E-12 && dp22 < 1E-12){
           // Mggp[ig1][ig2] = vcqg1 * rhoData[gdiffIndex]/ rhoData[0];
           data[IDX_eps(ig1, ig2)] = vcqg1 * rdg0;
+          // data[IDX_eps(ig1, ig2)] = rdg0;
+          // data[IDX_eps(ig1, ig2)] = rdg0;
         } else if (dp11 < 1E-12 && dp22 > 1E-12) {
           // Mggp[ig1][ig2] = 0.0;
           data[IDX_eps(ig1, ig2)] = 0.0;
@@ -366,7 +595,8 @@ void Gpp::calc_M0() {
           data[IDX_eps(ig1, ig2)] = 0.0;
         } else {
           // Mggp[ig1][ig2] = dp12*(vcqg1*vcqg2) * rhoData[gdiffIndex]/ rhoData[0];
-          data[IDX_eps(ig1, ig2)] = dp12*(vcqg1*vcqg2) * rdg0;
+          data[IDX_eps(ig1, ig2)] = sqrt(vcqg1*vcqg2) * dp12/(dp11*dp22) * rdg0;
+          // data[IDX_eps(ig1, ig2)] = dp12/(dp11*dp22) * rdg0;
         }  //end if
         // if (ig1_glob < 30 && ig2_glob < 30 && ig1_glob > 20 && ig2_glob > 20) {
         //   CkPrintf("%d %d %.12f %.12f %.12f %f %f %f %f\n", ig1_glob, ig2_glob, dp11, dp12, dp22, vcqg1, vcqg2, rdg0.re, data[IDX_eps(ig1, ig2)].re);
@@ -397,10 +627,10 @@ void Gpp::calc_omsq() {
     end_index = ( end_index < ng) ? end_index : ng;
     for (int i = 0; i < end_index-start_index; i++ ) {
       omsq[i] = data[IDX_eps(i, i)].re * factor / eigval[i];
-      if (i == 0) {
-        printf("i %d omsq %f %.8e factor %f data %f\n", i+start_index , omsq[i], eigval[i], factor, data[IDX_eps(i, i)].re);
-        fflush(stdout);
-      }
+      // if (i == 0) {
+        // printf("i %d omsq %f %.8e factor %f data %f\n", i+start_index , omsq[i], eigval[i], factor, data[IDX_eps(i, i)].re);
+        // fflush(stdout);
+      // }
     }
   }
 
@@ -461,29 +691,32 @@ void Gpp::debug() {
   // contribute(CkCallback(CkReductionTarget(Controller, gpp_debug_complete), controller_proxy));
 }
 
-void Gpp::sendToCacheV(int _size) {
-  unsigned size = _size;
-  // printf("GPP1d %d %d %d %d %d %d\n", thisIndex.x, thisIndex.y, config.tile_rows, size,config.chareCols(), config.chareRows());
+void Gpp::sendToCacheV(int size) {
   if (config.chareCols() != 1) {
-    CkAbort("GPP must be row decomposed!\n");
-  }
-  // TODO keep it like this for now 
+    CkAbort("Eigenvectors are stored in 1D chares\n");
+  }  
+  GWBSE *gwbse = GWBSE::get();
+  int* nfft;
+  nfft = gwbse->gw_parallel.fft_nelems;
+  int r_size = nfft[0]*nfft[1]*nfft[2];
   if (thisIndex.x < size) {
-    complex* new_data;
-    new_data = new complex[size];
-    int col_idx = thisIndex.x;
-    for(int j=0;j<size;j++) {
-      new_data[j] = data[j];
-      // printf("col_idx %d idx %d data %f\n", col_idx, j, data[j].re);
-    }
+    // complex* new_data;
+    // new_data = new complex[r_size];
+    int row_idx = thisIndex.x;
+    // for(int j=0;j<r_size;j++) {
+    //   new_data[j] = data[j];
+    //   // printf("col_idx %d idx %d data %f\n", row_idx, j, data[j].re);
+    // }
     
     GppVMessage* msg;
-    msg = new (size) GppVMessage(size, new_data);
+    msg = new (r_size) GppVMessage(r_size, B_r);
     msg->spin_index = 0; // TODO 
     msg->q_index = qindex;
-    msg->alpha_idx = col_idx;
-    msg->size = size;
+    msg->alpha_idx = row_idx;
+    msg->size = r_size;
+    msg->tot_alpha = size;
     psi_cache_proxy.receiveGppV(msg);
+    delete[] B_r;
   }
 }
 
