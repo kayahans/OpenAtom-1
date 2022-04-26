@@ -15,8 +15,9 @@ module gpp {
     entry void print(int qindex, int fnum);
     entry void print_col(int num);
     entry void calc_omsq();
-    entry void RtoG(int qindex);
-    entry void RtoG_skip();
+    entry void fft_RtoG(int qindex);
+    entry void fft_skip();
+    entry void ifft_GtoR(int qindex, int real_epsilon_size, std::vector<int> accept);
     entry void calculate_vc();
     entry void debug();
     entry void recvCopy(std::vector<complex> new_data);    

@@ -192,7 +192,7 @@ void WINDOWING::initialize(double*** e_occ, double*** e_unocc, int _nocc, int _n
     nq      = _nkpt;  // FIXME
     nkpt    = _nkpt;
     double _eV       = 1./27.2114;
-    ptol            = 1;                  // (hard coded)
+    ptol            = 10;                  // (hard coded)
     errfrac         = ptol/100;             // Percent tolerance converted to errfrac
     min_gap         = 0.1*_eV;              // (hard coded) Minimum gap to be considered metallic (0.1 eV)
     max_windows[0]  = 5;                    // (hard coded)

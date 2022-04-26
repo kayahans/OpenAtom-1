@@ -25,7 +25,7 @@ class GppVMessage : public CMessage_GppVMessage {
       std::copy(_eigv, _eigv+size, eigv);
       // std::copy(_eige, _eige+size, eige);
     }
-    int spin_index, q_index, alpha_idx, size;
+    int spin_index, q_index, alpha_idx, size, tot_alpha;
     complex* eigv;
     // double* eige;
 };

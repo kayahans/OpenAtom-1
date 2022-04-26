@@ -440,7 +440,7 @@ void PMatrix::sigma() {
   /*
   Below is the N3 Sigma algorithm as explained in PHYSICAL REVIEW B 101, 035139 (2020)
   We calculate Eq. 29 in that paper
-  However with k-point indexing the equation is a bit more involved. 
+  However due to additional k-point indexing, the actual equation is a bit more involved. 
   For GL terms the equation can be written as follows:
   <nk|\sigma^+(w)|n'k> = \sum_{lm} [\sum_u [w_u * exp^{-\tau_u*(\ksi*E_g^{lm}-1)} * B_{rr'}^{Nb,q,u} * A_{rr'}^{Na,q,u,k}]
   B_{rr'}^{Nb,q,u} = \sum_j^Nb B_{rr'}^{q,j} * exp^{-\ksi(E_g^{lm}-bj)*tau_u}
@@ -448,35 +448,38 @@ void PMatrix::sigma() {
   
   A similar equation is also written for <nk|\sigma^-(w)|n'k>
   Therefore there are main loops/conditionals: (complexity in parantheses)
-  1. Loop denotes sigma+ and sigma- (bloop) (constant=2)
-  2. Loop is over the window pairs (lm) (~constant)
-  2.a conditional In a window pair, one can determine if there are any bj energies at this point. 
-  3. Loop is over GL nodes (u) (~constant)
-  4. Loop is over GL/HGL calculation (constant=1,2)
-  5. Loop is over k-points (~constant=nk)
-  5.a conditional For every k-point, we have a set of E_nk (related to ai) energies. We determine if any ai is within this window pair
-  6.a Loop is over wpp Brr (r^2) = N2
-  6.b Loop is over states Arr (r^2) = N2
-  6.c Loop is over matrix elements (2 * r * r^2) = N3
+  1. (Loop) denotes sigma+ and sigma- (bloop) (constant=2)
+  2. (Loop) is over the window pairs (lm) (~constant)
+  2.a (conditional) In a window pair, one can determine if there are any bj energies at this point. 
+  3. (Loop) is over GL nodes (u) (~constant)
+  4. (Loop) is over GL/HGL calculation (constant=1,2)
+  5. (Loop) is over k-points (~constant=nk)
+  5.a (conditional) For every k-point, we have a set of E_nk (related to ai) energies. We determine if any ai is within this window pair
+  6.a (Loop) is over wpp Brr (r^2) = N2
+  6.b (Loop) is over states Arr (r^2) = N2
+  6.c (Loop) is over matrix elements (2 * r * r^2) = N3
   */
-  // 1. Loop over occ/unocc
+  // 1. (Loop) over occ/unocc
   for (int bloop=0; bloop < 2; bloop++) {
     bool bIsOccupied;
     int sigma_window_index;
     int state_start_index;
     int state_end_index;
+    double sigma_prefactor;
 
     if (bloop == 0) {
       bIsOccupied = true;
       sigma_window_index = 0;
       state_start_index = 0;
       state_end_index = nocc;
+      sigma_prefactor = 1.0;
     }
     else {
       bIsOccupied = false;
       sigma_window_index = 1;
       state_start_index = nocc;
       state_end_index   = nunocc; // opts.nstateCh;  // TODO (kayahans)
+      sigma_prefactor =  -1.0;
     }
 
     if (thisIndex.x == 0 && thisIndex.y == 0 && qindex==0 && bloop == 0) {
@@ -484,8 +487,12 @@ void PMatrix::sigma() {
     }
 
     // 2. loop over window pairs
+    int wi = 0;
     for (WINPAIR winpair : WIN->winpairs) {
-      
+      wi += 1;
+      // if (thisIndex.x == 0 && thisIndex.y==0 ) {
+      //   printf("Window %f %f %f %f %d \n", winpair.w1[0], winpair.w1[1], winpair.w2[0], winpair.w2[1], winpair.nodes.size());
+      // }      
       std::vector<double> pp_wp;     // PP energies w
       std::vector<int> pp_idx;      // indexes of the B in window
       double wpsq = 0;
@@ -526,11 +533,11 @@ void PMatrix::sigma() {
           const double wp_min       = winpair.w2[0];
           
           if (bIsHGL) {
-            iQuadFactor = 1./nkpt * w_u * winpair.gamma;  // MJ used -gamma here, check why and how it differs from zeta
+            iQuadFactor = w_u * winpair.gamma;  // MJ used -gamma here, check why and how it differs from zeta
             hgl_loops = 2;
             bIsFirstLoop = true;
           } else {
-            iQuadFactor = 1./nkpt * w_u * zeta * exp(-tau_u*(gap*zeta - 1.0));
+            iQuadFactor = w_u * zeta * exp(-tau_u*(gap*zeta - 1.0));
             hgl_loops = 1;
             bIsFirstLoop = false;
           }
@@ -539,7 +546,8 @@ void PMatrix::sigma() {
           for (int hgl_loop_idx=0; hgl_loop_idx < hgl_loops; hgl_loop_idx++) {
             // 5. loop over kpoints
             B_m = new complex[tile_size]; // gpp rr' tile
-            for (int ik = 0; ik < nkpt; ik++) {
+            // for (int ik = 0; ik < nkpt; ik++) {
+            for (int ik = 0; ik < 1; ik++) {
               kqIndex(ik, ikq, umklapp);
               double* _eig_occ = e_occ[is][ikq];
               double* _eig_unocc = e_unocc[is][ikq];
@@ -566,9 +574,9 @@ void PMatrix::sigma() {
               for (int istate = state_start_index; istate < state_end_index; istate++) {
                 
                 if (bIsOccupied) {
-                  shiftedStateEnergy = psi_eig[istate] - w;  // E_v - w
+                  shiftedStateEnergy = psi_eig[istate] - w;  // E_v - w (sigma_prefactor = -1)
                 } else {
-                  shiftedStateEnergy = w - psi_eig[istate];  // w - E_c
+                  shiftedStateEnergy = w - psi_eig[istate];  // w - E_c (sigma_prefactor = 1)
                 }
                 if (winpair.in_window(shiftedStateEnergy, window_index, sigma_window_index)) {
                   state_e.push_back(shiftedStateEnergy);
@@ -578,13 +586,17 @@ void PMatrix::sigma() {
               
               // 5.a if any ai are in this window pair
               if (state_e.size() > 0) {
-                if (thisIndex.x == 0 && thisIndex.y==0 && state_e.size()>0 && pp_wp.size()>0 && ik == 0 && inode == 0) {
-                  printf("Window %f %f %f %f %d %d %d %d %d \n", winpair.w1[0], winpair.w1[1], winpair.w2[0], winpair.w2[1], winpair.nodes.size(), state_e.size(), pp_wp.size(), ipp, ikq);
-                }                
+                if (thisIndex.x == 0 && thisIndex.y==0 && state_e.size()>0 && pp_wp.size()>0 && ik==0 && inode==0) {
+                  printf("Window pair: (%f, %f) (%f, %f)\n", winpair.w1[0], winpair.w1[1], winpair.w2[0], winpair.w2[1]);
+                  printf("State energies in window pair: %d\n", state_e.size());
+                  // print_vector(state_e);
+                  printf("PP energies in window pair: %d\n", pp_wp.size());
+                  // printf("Window %d %f %f %f %f %d %d %d \n", bloop, winpair.w1[0], winpair.w1[1], winpair.w2[0], winpair.w2[1], winpair.nodes.size(), state_e.size(), pp_wp.size());
+                }
                 // Calculate B only once 
                 if (ik==0) {
                   // start B^p_{rr'}  Eq. 35
-                  // 6a. Loop over PP moves with energies in window pair
+                  // 6a. (Loop) over PP moves with energies in window pair
                   for (int j = 0; j < pp_wp.size(); j++) { 
                     double omsq_j = gpp_omsq[pp_idx[j]];
                     if (omsq_j > 0) {
@@ -602,8 +614,23 @@ void PMatrix::sigma() {
                           factor *= cos(omega_j*tau_u*gamma);
                         }  // end if
                       }  // end if
-
+                      // TODO transfer FFT with tiling
                       complex* B_r = psi_cache->get_gpp_eigv(pp_idx[j]);
+                      complex* B_rx_local;
+                      complex* B_ry_local;
+                      B_rx_local = new complex[psi_ndata_local];
+                      B_ry_local = new complex[psi_ndata_local];
+                      
+                      // factor = 1.0;
+                      for (int i = 0; i < psi_ndata_local; i++) {
+                        B_rx_local[i]=B_r[thisIndex.x*psi_ndata_local + i];
+                        B_ry_local[i]=B_r[thisIndex.y*psi_ndata_local + i];
+                      }                
+                      // if (thisIndex.x == 0 && thisIndex.y==0 && state_e.size()>0 && pp_wp.size()>0 && ik == 0 && inode == 0 && pp_idx[j]==0) {
+                      //   for (int i = 0; i < psi_ndata_local; i++) {
+                      //     printf("%.12f %.12f\n",B_r[thisIndex.x*psi_ndata_local + i].re,B_r[thisIndex.y*psi_ndata_local + i].re);
+                      //   }
+                      // }
                       // printf("j: %d, inode: %d, B factor: %lf, tau_u: %lf, zeta %lf\n", j, inode, factor, tau_u, zeta);
 #ifdef USE_LAPACK
                       char transformT = 'C';
@@ -611,23 +638,36 @@ void PMatrix::sigma() {
                       int Lone        = 1;
                       double one    = 1.0;
                       // myGEMM( &transform, &transformT, &ndata, &ndata, &this_nocc, &Lalpha, _psis_occ2, &ndata, _psis_occ1, &ndata, &Lbeta, focc, &ndata);
-                      myGEMM(&transform, &transformT, &psi_ndata_local, &psi_ndata_local, &Lone,  &factor, B_r, &psi_ndata_local, B_r, &psi_ndata_local, &one, B_m, &psi_ndata_local);
+                      myGEMM(&transform, &transformT, &psi_ndata_local, &psi_ndata_local, &Lone,  &factor, B_rx_local, &psi_ndata_local, B_ry_local, &psi_ndata_local, &one, B_m, &psi_ndata_local);
+                      delete[] B_rx_local;
+                      delete[] B_ry_local;
+                      // delete[] B_r;
 #else
                     Die("Without -DUSE_LAPACK flag, N3 sigma calculation does not work!");
 #endif
                     } // end if (omsq_j > 0) {
                   }  // end B^p_{rr'}  Eq. 35 (6a)
+                  complex B_sum(0,0);
+                  for (int i = 0; i < tile_size; i++) {
+                    B_sum += B_m[i];
+                  }
+                  // if (thisIndex.x == 0 && thisIndex.y == 0) {
+                  if (true) {
+                    printf(" inode %d Bsum %d %d %f %f\n", inode, thisIndex.x, thisIndex.y,  B_sum.re, B_sum.im);                  
+                  }
                 }  // end if ik==0
-
+                
+                
                 F_m = new complex[tile_size]; // gpp rr' tile
                 // 6b. Calculate A for at all k 
                 for (int i_s = 0; i_s < state_e.size(); i_s++) {
+
                   complex* fr1 = new complex[psi_ndata_local]; //rho-bar matrix
-                  complex* fr2 = new complex[psi_ndata_local]; //rho-bar matrix                  
+                  complex* fr2 = new complex[psi_ndata_local]; //rho-bar matrix
                   for (int idx=0; idx<psi_ndata_local; idx++){
                     fr1[idx] =  psi_cache->psis[ikq][state_idx[i_s]][thisIndex.x*psi_ndata_local+idx];
                     fr2[idx] = psi_cache->psis[ikq][state_idx[i_s]][thisIndex.y*psi_ndata_local+idx];
-                  }
+                  }               
                   bool row = true;
                   if( umklapp[0]!=0 || umklapp[1]!=0 || umklapp[2]!=0 ){
                     modify_state_Uproc(fr1, umklapp, row);
@@ -645,6 +685,13 @@ void PMatrix::sigma() {
                       factor = sin(tau_u*state_e[i_s]*gamma);
                     }
                   }
+                  // for (int idx=0; idx<psi_ndata_local; idx++){
+                  //   fr1[idx].re = 0.0;
+                  //   fr2[idx].re = 0.0;
+                  //   fr1[idx].im = (thisIndex.x*psi_ndata_local + idx) * 1.0/10;
+                  //   fr2[idx].im = (thisIndex.y*psi_ndata_local + idx) * 1.0/10;
+                  // }   
+                  // factor = 1.0;
                   // printf("i: %d, inode: %d, State factor: %lf, tau_u: %lf, zeta %lf\n", i_s, inode, factor, tau_u, zeta);
                   // LAPACK
     #ifdef USE_LAPACK
@@ -663,9 +710,19 @@ void PMatrix::sigma() {
                 //   printf("B_m[0] %f %f\n", B_m[0].re, B_m[0].im);
                 //   printf("F_m[0] %f %f\n", F_m[0].re, F_m[0].im);
                 // }
+                complex F_sum(0,0);
+                for (int i = 0; i < tile_size; i++) {
+                  F_sum += F_m[i];
+                }
+                // if (thisIndex.x == 0 && thisIndex.y == 0) {
+                if(true) {
+                printf(" inode %d Fsum %d %d %f %f\n", inode, thisIndex.x, thisIndex.y, F_sum.re, F_sum.im);                
+                }
+                iQuadFactor = 1.0;
                 for (int idata = 0; idata < tile_size; idata++) {
                   sigma_m[idata] = iQuadFactor * F_m[idata] * B_m[idata];
-                }            
+                }
+                delete [] F_m;
                 // 6.c calculate Sigma(q,l,m,u)
                 for (int next_state = 0; next_state < n; next_state++) {
                   itup = ik*n + next_state;
@@ -676,6 +733,13 @@ void PMatrix::sigma() {
                     psiRk_n1[i] = psi_cache->psis[ik][np_list[next_state]-1][thisIndex.x*psi_ndata_local + i];
                     psiRk_n2[i] = psi_cache->psis[ik][np_list[next_state]-1][thisIndex.y*psi_ndata_local + i];
                   }
+                  // for (int i=0; i<psi_ndata_local; i++){
+                  //   psiRk_n1[i].re = 0.0;
+                  //   psiRk_n2[i].re = 0.0;
+                  //   psiRk_n1[i].im = 1.0;
+                  //   psiRk_n2[i].im = 1.0;
+                  // }
+                  
   #ifdef USE_LAPACK
                   char transformT = 'C';
                   char transform  = 'N';
@@ -690,10 +754,14 @@ void PMatrix::sigma() {
   #else
                   Die("Without -DUSE_LAPACK flag, N3 Sigma calculation does not work!");
   #endif    
+                  contribution = contribution * sigma_prefactor;
                   contrib_data[itup] += contribution;
                   total_contribution += contribution;
+                  // if (thisIndex.x == 0 && thisIndex.y == 0) {
+                    // printf(" inode %d sigmam %d %d %d %d %f %f %d %d %d %f %f\n", inode, bloop, ik, wi, inode, tau_u, w_u, next_state, thisIndex.x, thisIndex.y, sigma_prefactor, contribution.re * 1./winpair.nodes.size());
+                  // }
+                  
                 } // end 6.c
-                delete [] F_m;
               } // end 5.a if 
             } // end 5
             delete [] B_m;
@@ -702,19 +770,19 @@ void PMatrix::sigma() {
       } // end 2.a 
     } // end 2
   } // end 1
-
-// first tuple_size - 1 elements are num_kpoints * num_mtx_elements
-itup = 0;
-for(; itup < tuple_size-1;) {
-  tuple_reduction[itup] = CkReduction::tupleElement(sizeof(complex), &(contrib_data[itup]), CkReduction::sum_double);
-  itup++;
-} 
-// element of the tuple is total contribution
-tuple_reduction[itup] =  CkReduction::tupleElement(sizeof(complex), &total_contribution, CkReduction::sum_double);
-CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tuple_reduction, tuple_size);
-msg->setCallback(CkCallback(CkIndex_Controller::sigma_n3_complete(NULL), controller_proxy));
-contribute(msg);
-delete[] contrib_data;
+  
+  // first tuple_size - 1 elements are num_kpoints * num_mtx_elements
+  itup = 0;
+  for(; itup < tuple_size-1;) {
+    tuple_reduction[itup] = CkReduction::tupleElement(sizeof(complex), &(contrib_data[itup]), CkReduction::sum_double);
+    itup++;
+  } 
+  // element of the tuple is total contribution
+  tuple_reduction[itup] =  CkReduction::tupleElement(sizeof(complex), &total_contribution, CkReduction::sum_double);
+  CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tuple_reduction, tuple_size);
+  msg->setCallback(CkCallback(CkIndex_Controller::sigma_n3_complete(NULL), controller_proxy));
+  contribute(msg);
+  delete[] contrib_data;
 
 } // end void PMatrix::sigma()
 
@@ -926,6 +994,7 @@ void PMatrix::fftRows(int direction) {
   if (config.chareCols() != 1) {
     CkAbort("FFT not supported for 2D decompositions\n");
   }
+  // TODO (kayahans): how to make sure that fft R and G have the same array size?
   // FFT each row stored in this chare
   for (int i=0; i < config.tile_rows; i++){
     // First set up the data structures in the FFTController

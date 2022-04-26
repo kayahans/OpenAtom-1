@@ -218,67 +218,67 @@ void FFTController::get_geps(double epsCut, double* qvec, double* b1, double* b2
 
 //Values would need to be sent to Pmatrix geps
 
-   double gxtmp, gytmp, gztmp;
-    double vtmp[3];
-    double Ekin;
-    int eps_size = 0;
+  double gxtmp, gytmp, gztmp;
+  double vtmp[3];
+  double Ekin;
+  int eps_size = 0;
+    
+  for (int i=0; i<ndata; i++) { //can't be 0?
+      gxtmp = gx[i] + qvec[0];
+      gytmp = gy[i] + qvec[1];
+      gztmp = gz[i] + qvec[2];//iq was removed assuming 0 index - might be wrong, since we have only one node
+      /* transfer to cartesian unit to calculate energy */
+      Ekin = 0;
+      for (int j=0; j<3; j++) {
+          vtmp[j] = gxtmp*b1[j] + gytmp*b2[j] + gztmp*b3[j];
+          vtmp[j] *= 2*PI/alat;
+          Ekin += 0.5 * vtmp[j] * vtmp[j];
+      }
       
-    for (int i=0; i<ndata; i++) { //can't be 0?
-        gxtmp = gx[i] + qvec[0];
-        gytmp = gy[i] + qvec[1];
-        gztmp = gz[i] + qvec[2];//iq was removed assuming 0 index - might be wrong, since we have only one node
-        /* transfer to cartesian unit to calculate energy */
-        Ekin = 0;
-        for (int j=0; j<3; j++) {
-            vtmp[j] = gxtmp*b1[j] + gytmp*b2[j] + gztmp*b3[j];
-            vtmp[j] *= 2*PI/alat;
-            Ekin += 0.5 * vtmp[j] * vtmp[j];
-        }
-        
-        if (Ekin <= epsCut) {
-            accept[i] = true;
-            eps_size += 1;
-        }
-        else{
-            accept[i] = false;
-        }
+      if (Ekin <= epsCut) {
+          accept[i] = true;
+          eps_size += 1;
+      }
+      else{
+          accept[i] = false;
+      }
 
-    }
+  }
 
-    CkPrintf("[FFT CONTROLLER] Dimension of epsilon matrix = %d\n", eps_size);
-    // set values
-    geps->ng = eps_size;
-    geps->ig = new int [eps_size];
-    geps->jg = new int [eps_size];
-    geps->kg = new int [eps_size];
+  CkPrintf("[FFT CONTROLLER] Dimension of epsilon matrix = %d\n", eps_size);
+  // set values
+  geps->ng = eps_size;
+  geps->ig = new int [eps_size];
+  geps->jg = new int [eps_size];
+  geps->kg = new int [eps_size];
 
 
 
-    // ga = new double[eps_size];
-    // gb = new double[eps_size];
-    // gc = new double[eps_size];
-   
-    int j=0;
+  // ga = new double[eps_size];
+  // gb = new double[eps_size];
+  // gc = new double[eps_size];
+  
+  int j=0;
 
-    for (int i=0; i<ndata; i++) {
-        if (accept[i]) {
-            geps->ig[j] = gx[i];
-            geps->jg[j] = gy[i];
-            geps->kg[j] = gz[i];
-            j += 1;
-        }
-    }
-   
-    if ( j!= eps_size ) {
-        CkPrintf(" Oops. Error when reducing gspace!!!");
-    }
+  for (int i=0; i<ndata; i++) {
+      if (accept[i]) {
+          geps->ig[j] = gx[i];
+          geps->jg[j] = gy[i];
+          geps->kg[j] = gz[i];
+          j += 1;
+      }
+  }
+  
+  if ( j!= eps_size ) {
+      CkPrintf(" Oops. Error when reducing gspace!!!");
+  }
 
-    geps->ig_diff = new int [eps_size*eps_size];
-    geps->jg_diff = new int [eps_size*eps_size];
-    geps->kg_diff = new int [eps_size*eps_size];
+  geps->ig_diff = new int [eps_size*eps_size];
+  geps->jg_diff = new int [eps_size*eps_size];
+  geps->kg_diff = new int [eps_size*eps_size];
 
-    int ngdata = eps_size;
-    int k=0;
+  int ngdata = eps_size;
+  int k=0;
 
 #ifdef DEBUG_2
     for (int i=0; i<ngdata; i++)

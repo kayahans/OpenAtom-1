@@ -67,7 +67,8 @@ module controller {
     entry [reductiontarget] void copy_complete();
     entry [reductiontarget] void gpp_M0_complete();
     entry [reductiontarget] void gpp_fft_complete();
-    entry [reductiontarget] void RtoG_skipped();
+    entry [reductiontarget] void gpp_ifft_complete();
+    entry [reductiontarget] void fft_skipped();
     entry [reductiontarget] void gpp_omsq_complete();
     entry [reductiontarget] void gpp_vc_complete();
     entry [reductiontarget] void gpp_psi_cache_ready();
@@ -121,6 +122,7 @@ module controller {
 
 
       for(index=0;index<qpts;index++) {
+      // for(index=0;index<1;index++) {
       serial {
         if(all_qpts)
           qindex = index;
@@ -578,9 +580,10 @@ module controller {
           for(int k=0;k<K;k++){
             for(int ib=0;ib<Bands;ib++){
               complex dx = *(complex*)results[ik++].data;
+              double ha2eV = 27.2113825435;
               sigma_final[k][ib] += dx;
               CkPrintf("-----------------------------------------------------------------\n");
-              CkPrintf("| Sigma             | %d | %d | %d | %11.8f + %fi\t|\n", k, n_list[ib], np_list[ib], dx.re*27.2114, dx.im);
+              CkPrintf("| Sigma             | %d | %d | %d | %11.8f + %fi\t|\n", k, n_list[ib], np_list[ib], dx.re*ha2eV, dx.im);
               CkPrintf("|                   |   |   |   |                         \n");
               
             }
@@ -705,12 +708,11 @@ module controller {
         START_STEP("GPP Rhodata FFT R to G")
         // 
         if (qindex == 0) {
-          gpp2D_proxy.RtoG(qindex);
+          gpp2D_proxy.fft_RtoG(qindex);
           // controller_proxy.fft_rhodata(qindex);
         } else {
-          gpp2D_proxy.RtoG_skip();
+          gpp2D_proxy.fft_skip();
         }
-
       }
       serial {
         STOP_STEP("GPP Rhodata FFT R to G")
@@ -723,7 +725,7 @@ module controller {
           START_STEP("GPP prepare M0")
           gpp2D_proxy.calc_M0();
         }
-        when RtoG_skipped(), gpp_vc_complete() serial {
+        when fft_skipped(), gpp_vc_complete() serial {
           STOP_STEP("GPP calculate VC")
           START_STEP("GPP prepare M0")
           gpp2D_proxy.calc_M0();
@@ -789,23 +791,29 @@ module controller {
       }
       when gpp_M2_complete() {
         serial {
+          matrixCopy(sdiag_matrix2D_proxy, gpp1D_proxy, copyCB);
           gpp2D_M0_proxy.transferToGpp(gpp2D_proxy, false);
         }
+        when copyComplete(bool success) serial {
+          START_STEP("GPP Inverse FFT");
+          gpp1D_proxy.ifft_GtoR(qindex, real_epsilon_size, accept_result);
+        }
         when transferToGpp_complete() serial {
+          STOP_STEP("GPP Inverse FFT");
           START_STEP("GPP OMSQ")
           // gpp2D_proxy.print(7);
           gpp2D_proxy.calc_omsq();
         }
-      }
-      when gpp_omsq_complete() {
-        serial {
+        when gpp_omsq_complete() serial {
           STOP_STEP("GPP OMSQ")
+        }
+        when gpp_ifft_complete() serial { 
+          
           START_STEP("GPP Transferred to PsiCache")
-          matrixCopy(gpp2D_proxy, gpp1D_proxy, copyCB);
           psi_cache_proxy.init_gpp_cache(qindex);
         }
-        // For now, all eigenvectors and values are distributed to all PsiCache
-        when copyComplete(bool success), gpp_psi_cache_ready() serial {
+        when gpp_psi_cache_ready() serial {
+        // when copyComplete(bool success), gpp_psi_cache_ready() serial {          
           // Eigenvectors are sent after matrices are row decomposed from 1D object
           gpp1D_proxy.sendToCacheV(real_epsilon_size);
           // Eigenvalues and omsq (below) are sent from a tile column of 2D object
@@ -818,6 +826,31 @@ module controller {
           thisProxy.GppFormed();
         }
       }
+      // when gpp_omsq_complete() {
+      //   serial {
+      //     STOP_STEP("GPP OMSQ")
+      //     START_STEP("GPP Transferred to PsiCache")
+      //     matrixCopy(gpp2D_proxy, gpp1D_proxy, copyCB);
+      //     psi_cache_proxy.init_gpp_cache(qindex);
+      //   }
+      //   // For now, all eigenvectors and values are distributed to all PsiCache
+      //   when copyComplete(bool success) serial {
+      //     gpp1D_proxy.ifft_GtoR(qindex, real_epsilon_size);
+      //   }
+      //   when gpp_ifft_complete(), gpp_psi_cache_ready() serial {
+      //   // when copyComplete(bool success), gpp_psi_cache_ready() serial {          
+      //     // Eigenvectors are sent after matrices are row decomposed from 1D object
+      //     gpp1D_proxy.sendToCacheV(real_epsilon_size);
+      //     // Eigenvalues and omsq (below) are sent from a tile column of 2D object
+      //     gpp2D_proxy.sendToCacheE(real_epsilon_size);
+      //     gpp2D_proxy.sendToCacheO(real_epsilon_size);
+      //   }
+      //   when gppVCachesFilled(), gppECachesFilled(), gppOCachesFilled() serial {
+      //     STOP_STEP("GPP Transferred to PsiCache")
+      //     STOP_BIG_STEP("GPP FORMED");
+      //     thisProxy.GppFormed();
+      //   }
+      // }
     }
 
     entry void formPMatrix() {

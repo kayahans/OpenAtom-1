@@ -9,8 +9,8 @@
 class Gpp : public CBase_Gpp {
   Gpp_SDAG_CODE
   private:
-    // Structural basic input 
-    // used in setQindex
+    // Structural basic input used in setQindex
+    // 
     int qindex;
     double* qcryst;  // q-point in crystalline coord.
     double qcart[3]; // q-point in cartesian coord
@@ -20,37 +20,37 @@ class Gpp : public CBase_Gpp {
     double* b1; // reciprocal lattice parameters b1-b3 in cart. coord. [3] array
     double* b2;
     double* b3;
-    int* nfft;
-    int ndata;
+    int* nfft; // FFT grid dimensions
+    int ndata; // FFT array size (real space)
 
     // Strictly GPP related input below
-    // used in readInputFile
+    // used in readInputFile some of them might be obsolete TODO
     bool qespresso = true;      // if rho and state data are from Quantum Espresso(true/1) or not(false/0)
     int num_q = 8;              // number of q vectors
     int num_w = 1;       // number of points for w that we want to calculate.
-    double *w;      // values to be evaluated. read in
-    // int nr[3];           // number of (real-space) data points in each direction for rhofile
+    double *w;      // frequency values to be evaluated. read in
     
     // used in calculate_vc
     double* vcoulb;
     unsigned ng; // check if this is filtered?
     
-    double factor;
-    double* omsq;
-    double* eigval;
-    complex* rhoData;
+    double factor; 
+    double* omsq; // Omega square values 
+    double* eigval; // Eigenvalues from the eigendecomposition
+
+    complex* B_r; // Stores eigenvectors after Inverse FFT
     CLA_Matrix_interface matrix;
     unsigned data_received;
     double total_time;
     unsigned int blockSize, numBlocks, block;
-    // complex* rhoDataG;
     
   public:
     bool gpp_is_on = false;      // if gpp is on(true/1) or not(false/0)
     Gpp();
     Gpp(MatrixConfig config);
-    void RtoG(int qindex);
-    void RtoG_skip();
+    void fft_RtoG(int qindex);
+    void fft_skip();
+    void ifft_GtoR(int qindex, int real_epsilon_size, std::vector<int> accept);
     void calc_omsq();
     void debug();
     void print(int qindex, int fnum);
