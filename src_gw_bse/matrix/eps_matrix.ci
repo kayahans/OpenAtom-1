@@ -205,9 +205,12 @@ group DiagBridge{
             for (int i = 0; i < num_loc_rows; i++) { 
               for (int j = 0; j < num_loc_cols; j++) { 
                 bl_cyclic_index = start_index + (j * dd_row_size) + i;  // this before
-                msg->data[IDX_eps(i,j)].re = diagData->eig_v[bl_cyclic_index].real();
-                msg->data[IDX_eps(i,j)].im = diagData->eig_v[bl_cyclic_index].imag();
-                
+                // msg->data[IDX_eps(i,j)].re = diagData->eig_v[bl_cyclic_index].real();
+                // msg->data[IDX_eps(i,j)].im = diagData->eig_v[bl_cyclic_index].imag();
+                msg->data[IDX_eps(j,i)].re = diagData->eig_v[bl_cyclic_index].real();
+                msg->data[IDX_eps(j,i)].im = diagData->eig_v[bl_cyclic_index].imag();
+
+
                 // bl_cyclic_index = start_index + (i * dd_col_size) + j;
                 // msg->data[IDX_eps(i,j)].re = diagData->eig_v[bl_cyclic_index].real();
                 // msg->data[IDX_eps(i,j)].im = diagData->eig_v[bl_cyclic_index].imag();
@@ -238,7 +241,8 @@ group DiagBridge{
                 // if (mype == 0 && j == 0)
                 //   CkPrintf("Eig %d %f\n",i+glob_start_row, diagData->eig_e[glob_start_row+i]);
               }
-              msg = eps_matrix2D_proxy(eps_row_idx, eps_col_idx).sendDataSimple(msg);
+              // msg = eps_matrix2D_proxy(eps_row_idx, eps_col_idx).sendDataSimple(msg);
+              msg = eps_matrix2D_proxy(eps_col_idx, eps_row_idx).sendDataSimple(msg);
             // delete msg;
             // CkPrintf("pe %d inputsize %d tile r/c %d/%d block %dx%d start %d\n", mype, totaldata, idx_row, idx_col, num_loc_rows, num_loc_cols, start_index);
             } 

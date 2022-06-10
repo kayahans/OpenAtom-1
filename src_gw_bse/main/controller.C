@@ -278,9 +278,15 @@ complex* PsiCache::get_gpp_eigv(int alpha) {
 void PsiCache::calculate_windows() {
   double w = 0.23;
   char sigma[] = "Sigma";
-  WIN->sigma_win(w, gpp_omsq, ng);
-  WIN->searchwins(sigma); // on the fly windowing optimization
-  // printf("Sigma windowing optimized\n");
+  // WIN->sigma_win(w, gpp_omsq, ng);
+  // WIN->searchwins(sigma); // on the fly windowing optimization
+  WIN->read_from_file();
+  // if (thisIndex == 0) {
+  //   printf("Index omsq eigv\n");
+  //   for (int i =0; i < ng; i++) {
+  //     printf("%d %f %f \n", i, gpp_omsq[i], gpp_eige[i]);
+  //   }
+  // }
   contribute(CkCallback(CkReductionTarget(Controller,gpp_windows_ready), controller_proxy));
 }
 

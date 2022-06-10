@@ -191,8 +191,8 @@ void WINDOWING::initialize(double*** e_occ, double*** e_unocc, int _nocc, int _n
     nspin   = _nspin;
     nq      = _nkpt;  // FIXME
     nkpt    = _nkpt;
-    double _eV       = 1./27.2114;
-    ptol            = 10;                  // (hard coded)
+    double _eV      = 1./27.2114;
+    ptol            = 1;                  // (hard coded)
     errfrac         = ptol/100;             // Percent tolerance converted to errfrac
     min_gap         = 0.1*_eV;              // (hard coded) Minimum gap to be considered metallic (0.1 eV)
     max_windows[0]  = 5;                    // (hard coded)
@@ -459,6 +459,12 @@ void WINDOWING::printparameters() const {
     printf("\tErrfrac : %f (equal to ptol = %f)\n", errfrac, ptol);
     printf("\tMinimum gap: %f Ha \n", min_gap);
     printf("\tMax valence and conduction windows : (%d, %d) \n", max_windows[0], max_windows[1]);
+    printf("\tOptimized number of windows: %d %d\n", opt_num_windows[0], opt_num_windows[1]);
+    int i = 0;
+    for (WINPAIR wp : winpairs) { 
+      printf("Window pair %d %f-%f and %f-%f %d\n", i, wp.w1[0], wp.w1[1], wp.w2[0], wp.w2[1], wp.ngl);
+    }
+
     // printf("\t w1_d     w1_u     w2_d     w2_u     n ns nb ng\n");
 }
 

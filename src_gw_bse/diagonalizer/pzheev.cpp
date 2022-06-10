@@ -240,7 +240,28 @@ int main(int argc, char **argv){
       // }
       // fclose(fp);
     }
-
+    {
+      // Print eigenvectors to stdout
+      // int k = 0;
+      // for (int i = 0; i < mpA; i++) {
+      //   for (int j = 0; j < nqA; j++) {
+      //     // diagData->eig_v[(i*nqA)+j] = Z[(i*nqA)+j];
+      //     int global_tile_row = i / 20 + myrow;
+      //     int global_tile_col = j / 20 + mycol;
+      //     int global_row = i + global_tile_row * 20;
+      //     int global_col = j + global_tile_col * 20;
+      //     if (global_col == 0) {
+      //       // printf("[DIAGONALIZER] pe %d eig_v (%d,%d) global (%d, %d) idx %d %.8e %d, %d\n",
+      //       // iam, i, j, global_row, global_col, j, Z[(j*mpA)+i].real(), myrow+1, mycol+1);
+      //     // fprintf(fp, " %d %d %d %d %d %.8e %.8e %d %d\n",
+      //     //   iam, i, j, global_row, global_col, Z[(j*mpA)+i].real(), Z[(j*mpA)+i].imag(), myrow+1, mycol+1);
+      //     printf(" %d %d %d %d %d %.8e %.8e %d %d\n",
+      //       iam, i, j, global_row, global_col, Z[(j*mpA)+i].real(), Z[(j*mpA)+i].imag(), myrow+1, mycol+1);
+      //     //   k++;
+      //     }
+      //   }
+      // }
+    }
     {
       // Print eigenvalues
       // if (iam == 0) {

@@ -95,6 +95,7 @@ double FFTController::compute_average_mbz(const double pa,const double pb,const 
 double FFTController::average_mbz(double pa,double pb,double pc,double *hmatik,
                    int Na,int Nb,int Nc,double tol)
 {
+  printf("\n\t\t\t\tUSING COULOMB AVERAGING FOR SIGMA\n\n");
   printf("pa=%g pb=%g pc=%g tol=%g : n avg\n",pa,pb,pc,tol);
   // we are going to make a table of computed results as we go
   // actually, only the last two entries are useful...

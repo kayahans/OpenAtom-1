@@ -182,6 +182,7 @@ void EpsMatrix::bareExchange() {
   
   if(qindex==0)
     vcoulb[0] = psi_cache->getVCoulb0();
+    // printf("VC0 %f\n", vcoulb[0]);
 
   if(thisIndex.x == thisIndex.y) {
     for (int k = 0; k < K; k++) {

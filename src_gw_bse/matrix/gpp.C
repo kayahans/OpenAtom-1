@@ -284,12 +284,16 @@ void Gpp::ifft_GtoR(int qindex, int real_epsilon_size, std::vector<int> accept) 
   g[0] = ga;
   g[1] = gb;
   g[2] = gc;
-  // if (thisIndex.x == 0 && thisIndex.y == 0) {
-  //   // for (int i=0; i<real_epsilon_size; i++)
-  //   int i = 0;
-  //   printf("rhop %d %f %f \n", i, data[i].re, data[i].re * data[i].re + data[i].im * data[i].im);
-  //   i = real_epsilon_size - 1;
-  //   printf("rhop %d %f %f \n", i, data[i].re, data[i].re * data[i].re + data[i].im * data[i].im);
+  // int index_deb = 1;
+  // if (thisIndex.x == index_deb) {
+  //   printf("xy %d,%d\n", thisIndex.x, thisIndex.y);
+  //   // printf("%d eig %f omsq %f\n", index_deb, eigval[index_deb], omsq[index_deb]);
+  //   for (int i=0; i<real_epsilon_size; i++) {
+  //     printf("rhop %d %f %f \n", i, data[i].re, data[i].im);
+  //     // i = real_epsilon_size - 1;
+  //     // printf("rhop %d %f %f \n", i, data[i].re, data[i].re * data[i].re + data[i].im * data[i].im);
+  //   }
+  //   CkExit();
   // }
   
   int **fftidx;
@@ -312,9 +316,9 @@ void Gpp::ifft_GtoR(int qindex, int real_epsilon_size, std::vector<int> accept) 
   // }
   // if (thisIndex.x==0) {
   //   for (int i = 0; i < numCoeff; i++) {
-  //     data[i].re = 1.0;
-  //     data[i].im = 0.0;
-  //     // printf("input %d %f %f\n", i, data[i].re, data[i].im);
+  //     // data[i].re = 1.0;
+  //     // data[i].im = 0.0;
+  //     printf("input %d %f %f\n", i, data[i].re, data[i].im);
   //   } 
   //   // for (int i = 0; i < numCoeff; i++) {
   //   //   printf("idx %d %d %d %d\n", i, fftidx[i][0], fftidx[i][1], fftidx[i][2]);
@@ -358,6 +362,16 @@ void Gpp::ifft_GtoR(int qindex, int real_epsilon_size, std::vector<int> accept) 
     delete[] fftidx[i];
   
   delete[] fftidx;
+  //   if (thisIndex.x==0) {
+  //   for (int i = 0; i < ndata; i++) {
+  //     // data[i].re = 1.0;
+  //     // data[i].im = 0.0;
+  //     printf("output %d %f %f\n", i, B_r[i].re, B_r[i].im);
+  //   } 
+  //   // for (int i = 0; i < numCoeff; i++) {
+  //   //   printf("idx %d %d %d %d\n", i, fftidx[i][0], fftidx[i][1], fftidx[i][2]);
+  //   // } 
+  // }  
   // printf("%d %d %d\n", thisIndex.x, thisIndex.y, ndata);
   contribute(CkCallback(CkReductionTarget(Controller, gpp_ifft_complete), controller_proxy));
 }
@@ -598,7 +612,7 @@ void Gpp::calc_M0() {
           data[IDX_eps(ig1, ig2)] = sqrt(vcqg1*vcqg2) * dp12/(dp11*dp22) * rdg0;
           // data[IDX_eps(ig1, ig2)] = dp12/(dp11*dp22) * rdg0;
         }  //end if
-        // if (ig1_glob < 30 && ig2_glob < 30 && ig1_glob > 20 && ig2_glob > 20) {
+        // if (ig1_glob < 5 && ig2_glob < 5) {
         //   CkPrintf("%d %d %.12f %.12f %.12f %f %f %f %f\n", ig1_glob, ig2_glob, dp11, dp12, dp22, vcqg1, vcqg2, rdg0.re, data[IDX_eps(ig1, ig2)].re);
         //   // CkPrintf("%f %f %f %f %f %f %d %d %d \n", g1[0], g1[1], g1[2],g2[0], g2[1], g2[2], gdiff[0], gdiff[1], gdiff[2]);
         // }
@@ -627,10 +641,10 @@ void Gpp::calc_omsq() {
     end_index = ( end_index < ng) ? end_index : ng;
     for (int i = 0; i < end_index-start_index; i++ ) {
       omsq[i] = data[IDX_eps(i, i)].re * factor / eigval[i];
-      // if (i == 0) {
-        // printf("i %d omsq %f %.8e factor %f data %f\n", i+start_index , omsq[i], eigval[i], factor, data[IDX_eps(i, i)].re);
+      if (i == 0) {
+        printf("i %d omsq %f %.8e factor %f data %f\n", i+start_index , omsq[i], eigval[i], factor, data[IDX_eps(i, i)].re);
         // fflush(stdout);
-      // }
+      }
     }
   }
 
