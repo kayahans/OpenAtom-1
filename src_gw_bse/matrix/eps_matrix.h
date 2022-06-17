@@ -43,7 +43,10 @@ class EpsMatrix : public CBase_EpsMatrix {
 
     void checkReady();
     void createTranspose(CProxy_EpsMatrix other, bool todo);
+    void createSwap(CProxy_EpsMatrix other);
+    void transposeAndHerm();
     void createConjugate(CProxy_EpsMatrix other);
+    void receiveSwap(std::vector<complex> incoming);
     void receiveTranspose(std::vector<complex> incoming);
     void receiveConjugate(std::vector<complex> incoming);
     void calc_vcoulb();

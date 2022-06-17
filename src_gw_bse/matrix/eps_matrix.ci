@@ -12,7 +12,10 @@ module eps_matrix {
     entry EpsMatrix();
     entry EpsMatrix(MatrixConfig config);
     entry void createTranspose(CProxy_EpsMatrix other, bool todo);
+    entry void createSwap(CProxy_EpsMatrix other);
+    entry void transposeAndHerm();
     entry void createConjugate(CProxy_EpsMatrix other);
+    entry void receiveSwap(std::vector<complex> incoming);
     entry void receiveTranspose(std::vector<complex> incoming);
     entry void receiveConjugate(std::vector<complex> incoming);
     entry void multiply(double alpha, double beta);

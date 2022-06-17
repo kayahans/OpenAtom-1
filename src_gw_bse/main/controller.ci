@@ -64,6 +64,8 @@ module controller {
     entry [reductiontarget] void transposeComplete();
     entry [reductiontarget] void copyComplete(bool success);
     entry [reductiontarget] void transpose_complete();
+    entry [reductiontarget] void swap_complete();
+    entry [reductiontarget] void transposeAndHerm_complete();
     entry [reductiontarget] void copy_complete();
     entry [reductiontarget] void gpp_M0_complete();
     entry [reductiontarget] void gpp_fft_complete();
@@ -628,23 +630,10 @@ module controller {
 
     }
     entry void formGpp() {
-      // Print S-matrix to verify (start)
-      // serial {
-      //   matrixCopy(s_matrix2D_proxy, s_matrix1D_proxy, copyCB);
-      // }
-      // when copyComplete(bool success) {}
-      // serial {
-      //   std::string filename = "data/Smatrix_q" + std::to_string(qindex);
-      //   matrixWrite(s_matrix1D_proxy, filename, writeCB);
-      // }
-      // Print S-matrix to verify (end)
       serial {
         START_STEP("GPP FORMED");
-        // START_STEP("Store S Matrix");
-        // CkPrintf("[CONTROLLER] Transfer Eps to Gpp\n");
         matrixCopy(s_matrix2D_proxy, sdiag_matrix2D_proxy, copyCB);
       }
-      // HERE below are for S matrix 
       when copyComplete(bool success) serial{
         sdiag_matrix2D_proxy.print(qindex, 0);  // Print S to EPS_0 before reading
 #if 0
@@ -686,30 +675,28 @@ module controller {
         START_STEP("Transfer S from MPI")
         diag_bridge_proxy.copyFromMPI(qindex, real_epsilon_size, sdiag_matrix2D_proxy, gpp2D_proxy);
         // Each row of sdiag_matrix2D_proxy is an eigenvector
-        // Print first eigenvector: sdiag_matrix2D_proxy.print_row(0);
+        // Example: print first eigenvector-> sdiag_matrix2D_proxy.print_row(0);
       }
       // kayahan
       when mpi_received_complete () serial {
         STOP_STEP("Transfer S from MPI")
         START_STEP("S Transpose")
-        // sdiag_matrix2D_proxy.createTranspose(sdiagT_matrix2D_proxy, false);
-#if 1
-        sdiag_matrix2D_proxy.print(qindex, 2); // Print eigenvectors to EPS_2 
-#endif
-#if 0
-        sdiag_matrix2D_proxy.print(qindex, 21); // Print eigenvectors to EPS_21 from read S
-#endif
-#if 0
-        sdiag_matrix2D_proxy.print(qindex, 22); // Print eigenvectors to EPS_22 from magic m
-#endif
-      // }
-      // when transpose_complete() serial {
+        sdiag_matrix2D_proxy.createSwap(sdiagT_matrix2D_proxy);
+// #if 1
+//         sdiag_matrix2D_proxy.print(qindex, 2); // Print eigenvectors to EPS_2 
+// #endif
+// #if 0
+//         sdiag_matrix2D_proxy.print(qindex, 21); // Print eigenvectors to EPS_21 from read S
+// #endif
+// #if 0
+//         sdiag_matrix2D_proxy.print(qindex, 22); // Print eigenvectors to EPS_22 from magic m
+// #endif
+      }
+      when swap_complete() serial {
         STOP_STEP("S Transpose")
         START_STEP("GPP Rhodata FFT R to G")
-        // 
         if (qindex == 0) {
           gpp2D_proxy.fft_RtoG(qindex);
-          // controller_proxy.fft_rhodata(qindex);
         } else {
           gpp2D_proxy.fft_skip();
         }
@@ -737,55 +724,53 @@ module controller {
         gpp2D_M0_proxy.transferFromGpp(gpp2D_proxy, false);
       }
       when transferfromGpp_complete() serial{
-        gpp2D_proxy.print(qindex, 1); // Print M0 to GPP_1 files
-        gpp2D_M0_proxy.print(qindex, 3); // Print M0 to EPS_3 files
-        //M0*V = M1
-        mat_mul_proxy.do_multiply(gpp2D_M0_proxy, sdiag_matrix2D_proxy, gpp2D_M1_proxy, 1.0);  // M1
+        // gpp2D_proxy.print(qindex, 1); // Print M0 to GPP_1 files
+        // gpp2D_M0_proxy.print(qindex, 3); // Print M0 to EPS_3 files
+        //M0*V^T = M1
+        mat_mul_proxy.do_multiply(gpp2D_M0_proxy, sdiagT_matrix2D_proxy, gpp2D_M1_proxy, 1.0);  // M1
       }
       when m_multiplied() serial {
         STOP_STEP("GPP M1 = M0 * V^T Step 1/2")
-#if 1
-        gpp2D_M1_proxy.print(qindex, 4); // Print M0 mul1 to EPS_3
-#endif
-#if 0
-        gpp2D_M1_proxy.print(qindex, 41); // Print M0 mul1 to EPS_3 from read S
-#endif
-#if 0
-        gpp2D_M1_proxy.print(qindex, 42); // Print M0 mul1 to EPS_3 from magic m
-#endif
-
+// #if 1
+//         gpp2D_M1_proxy.print(qindex, 4); // Print M0 mul1 to EPS_4
+// #endif
+// #if 0
+//         gpp2D_M1_proxy.print(qindex, 41); // Print M0 mul1 to EPS_41 from read S
+// #endif
+// #if 0
+//         gpp2D_M1_proxy.print(qindex, 42); // Print M0 mul1 to EPS_42 from magic m
+// #endif
         thisProxy.gpp_M1_complete();
       }
       when gpp_M1_complete() {
         serial {
           START_STEP("GPP M = V^H * M1 Step 2/2")
-          sdiag_matrix2D_proxy.createTranspose(sdiagT_matrix2D_proxy, true);
+          sdiag_matrix2D_proxy.transposeAndHerm();
         }
-        when transpose_complete() serial {
-#if 1
-          sdiagT_matrix2D_proxy.print(qindex, 6); // Print M0 mul2 to EPS_5
-#endif
-#if 0
-          sdiagT_matrix2D_proxy.print(qindex, 61); // Print V hermitian from read S
-#endif
-#if 0
-          sdiagT_matrix2D_proxy.print(qindex, 62); // Print V hermitian from magic m
-#endif          
-          //V^H*M1 = M2
-          mat_mul_proxy.do_multiply(sdiagT_matrix2D_proxy, gpp2D_M1_proxy, gpp2D_M0_proxy, 1.0); // M2
+        when transposeAndHerm_complete() serial {
+// #if 1
+//           sdiagT_matrix2D_proxy.print(qindex, 6); // Print M0 mul2 to EPS_6
+// #endif
+// #if 0
+//           sdiagT_matrix2D_proxy.print(qindex, 61); // Print V hermitian from read S
+// #endif
+// #if 0
+//           sdiagT_matrix2D_proxy.print(qindex, 62); // Print V hermitian from magic m
+// #endif
+          // V^H*M1 = M2
+          mat_mul_proxy.do_multiply(sdiag_matrix2D_proxy, gpp2D_M1_proxy, gpp2D_M0_proxy, 1.0); // M2
         }
         when m_multiplied() serial {
           STOP_STEP("GPP M = V^H * M1 Step 2/2")
-          // Print to EPS_2 files
-#if 1
-          gpp2D_M0_proxy.print(qindex, 5); // Print M0 mul2 to EPS_5
-#endif
-#if 0
-          gpp2D_M0_proxy.print(qindex, 51); // Print M0 mul2 to EPS_51 from read S
-#endif
-#if 0
-          gpp2D_M0_proxy.print(qindex, 52); // Print M0 mul2 to EPS_52 from magic m
-#endif
+// #if 1
+//           gpp2D_M0_proxy.print(qindex, 5); // Print M0 mul2 to EPS_5
+// #endif
+// #if 0
+//           gpp2D_M0_proxy.print(qindex, 51); // Print M0 mul2 to EPS_51 from read S
+// #endif
+// #if 0
+//           gpp2D_M0_proxy.print(qindex, 52); // Print M0 mul2 to EPS_52 from magic m
+// #endif
           thisProxy.gpp_M2_complete();
         }
       }
@@ -801,19 +786,16 @@ module controller {
         when transferToGpp_complete() serial {
           STOP_STEP("GPP Inverse FFT");
           START_STEP("GPP OMSQ")
-          // gpp2D_proxy.print(7);
           gpp2D_proxy.calc_omsq();
         }
         when gpp_omsq_complete() serial {
           STOP_STEP("GPP OMSQ")
         }
         when gpp_ifft_complete() serial { 
-          
           START_STEP("GPP Transferred to PsiCache")
           psi_cache_proxy.init_gpp_cache(qindex);
         }
         when gpp_psi_cache_ready() serial {
-        // when copyComplete(bool success), gpp_psi_cache_ready() serial {          
           // Eigenvectors are sent after matrices are row decomposed from 1D object
           gpp1D_proxy.sendToCacheV(real_epsilon_size);
           // Eigenvalues and omsq (below) are sent from a tile column of 2D object
@@ -826,31 +808,6 @@ module controller {
           thisProxy.GppFormed();
         }
       }
-      // when gpp_omsq_complete() {
-      //   serial {
-      //     STOP_STEP("GPP OMSQ")
-      //     START_STEP("GPP Transferred to PsiCache")
-      //     matrixCopy(gpp2D_proxy, gpp1D_proxy, copyCB);
-      //     psi_cache_proxy.init_gpp_cache(qindex);
-      //   }
-      //   // For now, all eigenvectors and values are distributed to all PsiCache
-      //   when copyComplete(bool success) serial {
-      //     gpp1D_proxy.ifft_GtoR(qindex, real_epsilon_size);
-      //   }
-      //   when gpp_ifft_complete(), gpp_psi_cache_ready() serial {
-      //   // when copyComplete(bool success), gpp_psi_cache_ready() serial {          
-      //     // Eigenvectors are sent after matrices are row decomposed from 1D object
-      //     gpp1D_proxy.sendToCacheV(real_epsilon_size);
-      //     // Eigenvalues and omsq (below) are sent from a tile column of 2D object
-      //     gpp2D_proxy.sendToCacheE(real_epsilon_size);
-      //     gpp2D_proxy.sendToCacheO(real_epsilon_size);
-      //   }
-      //   when gppVCachesFilled(), gppECachesFilled(), gppOCachesFilled() serial {
-      //     STOP_STEP("GPP Transferred to PsiCache")
-      //     STOP_BIG_STEP("GPP FORMED");
-      //     thisProxy.GppFormed();
-      //   }
-      // }
     }
 
     entry void formPMatrix() {
