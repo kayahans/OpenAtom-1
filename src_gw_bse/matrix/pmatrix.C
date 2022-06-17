@@ -528,6 +528,8 @@ void PMatrix::sigma() {
             print_vector(state_e);
             printf("\tPP energies in window pair: %d\n\t", pp_wp.size());
             print_vector(pp_wp);
+            printf("PP indexes:\n");
+            print_vector(pp_idx);
           }
           for (int inode = 0; inode < winpair.nodes.size(); inode++) {
             // Quadrature constants
@@ -558,11 +560,9 @@ void PMatrix::sigma() {
               // Brr' start
               //
               for (int j = 0; j < pp_wp.size(); j++) { 
-                // double omsq_j = gpp_omsq[pp_idx[j]];
-                double omsq_j = gpp_omsq[0];
+                double omsq_j = gpp_omsq[pp_idx[j]];
                 if (omsq_j > 0) {
-                  // double sigma_j = gpp_eig[pp_idx[j]];
-                  double sigma_j = gpp_eig[0];
+                  double sigma_j = gpp_eig[pp_idx[j]];
                   double omega_j = sqrt(omsq_j);
                   double factor  = sigma_j*omega_j/2.0;
                   // double factor  = sigma_j/2.0;
@@ -696,10 +696,10 @@ void PMatrix::sigma() {
         #else
           Die("Without -DUSE_LAPACK flag, N3 Sigma calculation does not work!");
         #endif
-        // printf("CONT %f\n", contribution.re);
+        printf("CONT %f\n", contribution.re);
         contrib_data[itup] += sigma_prefactor * contribution;
         total_contribution += sigma_prefactor * contribution;
-        // printf("SIGMA: %f\n", sigma_prefactor * contribution.re);
+        printf("SIGMA: %f\n", sigma_prefactor * contribution.re);
       }
       delete [] sigma_m;
     }
