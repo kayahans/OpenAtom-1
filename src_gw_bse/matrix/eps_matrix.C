@@ -384,6 +384,9 @@ void EpsMatrix::receiveConvCheck(std::vector<complex> data_in) {
 }
 
 void EpsMatrix::createTranspose(CProxy_EpsMatrix other, bool todo) {
+  /*
+  Create conjugate transpose. If todo is false, then this just creates a copy (bad code)
+  */
   std::vector<complex> incoming;
   for(int i=0; i < config.tile_rows; i++) {
     for(int j=0; j < config.tile_cols; j++) {
@@ -404,6 +407,33 @@ void EpsMatrix::createTranspose(CProxy_EpsMatrix other, bool todo) {
   }
 }
 
+void EpsMatrix::createSwap(CProxy_EpsMatrix other) {
+  /*
+  Swap the x,y elements to y,x without transpose
+  */
+  std::vector<complex> incoming;
+  for(int i=0; i < config.tile_rows; i++) {
+    for(int j=0; j < config.tile_cols; j++) {
+      complex swap = data[IDX_eps(j,i)];
+      incoming.push_back(swap);
+    }
+  }
+  other(thisIndex.y, thisIndex.x).receiveSwap(incoming);
+}
+
+void EpsMatrix::transposeAndHerm() {
+  // First take the regular transpose and take hermitian transpose
+  // Which means just change the sign of imaginary values in place
+  // Required for matrix multiplication
+  std::vector<complex> incoming;
+  for(int i=0; i < config.tile_rows; i++) {
+    for(int j=0; j < config.tile_cols; j++) {
+        data[IDX_eps(i,j)].im *= -1;
+    }
+  }
+  contribute(CkCallback(CkReductionTarget(Controller, transposeAndHerm_complete), controller_proxy));
+}
+
 void EpsMatrix::receiveTranspose(std::vector<complex> new_data) {
   unsigned n = 0;
   for(int i=0;i<config.tile_rows;i++)
@@ -411,6 +441,15 @@ void EpsMatrix::receiveTranspose(std::vector<complex> new_data) {
       data[IDX_eps(i,j)] = new_data[n++];
 
   contribute(CkCallback(CkReductionTarget(Controller, transpose_complete), controller_proxy));
+}
+
+void EpsMatrix::receiveSwap(std::vector<complex> new_data) {
+  unsigned n = 0;
+  for(int i=0;i<config.tile_rows;i++)
+    for(int j=0;j<config.tile_cols;j++)
+      data[IDX_eps(i,j)] = new_data[n++];
+
+  contribute(CkCallback(CkReductionTarget(Controller, swap_complete), controller_proxy));
 }
 
 void EpsMatrix::transferToGpp(CProxy_Gpp other, bool todo) {
