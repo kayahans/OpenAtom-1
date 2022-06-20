@@ -26,7 +26,9 @@ class GW_SIGMA{
     double bare_coulomb_cutoff;         // Num: cutoff for bare coulomb (eV)
     
     int sigma_mode;  // 0 for static sigma calculation
-                     // 1 for GPP 
+                     // 1 for GPP
+    double ptol;
+    bool read_win;
     int proc_rows;
     int proc_cols;
     char rhoFilename[200];
@@ -45,6 +47,8 @@ class GW_SIGMA{
       n_list_sig_matels = 0;
       np_list_sig_matels = 0;
       sigma_mode = 0;
+      ptol = 0.0;
+      read_win = false;
       proc_cols = 0;
       proc_rows = 0;
       ndata_rho = 0;
@@ -66,6 +70,8 @@ class GW_SIGMA{
       p | screened_coulomb_cutoff;
       p | bare_coulomb_cutoff;
       p | sigma_mode;
+      p | ptol;
+      p | read_win;
       p | proc_rows;
       p | proc_cols;
       p | ndata_rho;
@@ -104,6 +110,8 @@ class GW_SIGMA{
       fprintf(fp,"screened_coulomb_cutoff %lg\n",screened_coulomb_cutoff);
       fprintf(fp,"bare_coulomb_cutoff %lg\n",bare_coulomb_cutoff);
       fprintf(fp,"sigma_mode %d\n",sigma_mode);
+      fprintf(fp,"ptol %lg\n",ptol);
+      fprintf(fp,"read_win %d\n",read_win);
       fprintf(fp,"proc_rows %d\n",proc_rows);
       fprintf(fp,"proc_cols %d\n",proc_cols);
       fclose(fp);

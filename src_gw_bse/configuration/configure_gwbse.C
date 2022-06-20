@@ -405,8 +405,8 @@ void Config::set_config_dict_gen_GW  (int *num_dict ,DICT_WORD **dict){
 //===================================================================================
 void Config::set_config_dict_GW_epsilon  (int *num_dict ,DICT_WORD **dict){
   //==================================================================================
-  //  I) Malloc the dictionary                                              
-  num_dict[0] = 6;
+  //  I) Malloc the dictionary
+  num_dict[0] = 7;
   *dict = (DICT_WORD *)cmalloc(num_dict[0]*sizeof(DICT_WORD),"set_dict_gen_GW")-1;
 
   //=================================================================================
@@ -470,6 +470,11 @@ void Config::set_config_dict_GW_epsilon  (int *num_dict ,DICT_WORD **dict){
   strcpy((*dict)[ind].keyarg,"occupations.in");
   strcpy((*dict)[ind].error_mes,"a file containing nocc + nunocc occ values");
 
+  // 7) N3 P{}
+  ind = 7;
+  strcpy((*dict)[ind].keyword,"n3_p");
+  strcpy((*dict)[ind].keyarg,"off");
+  strcpy((*dict)[ind].error_mes,"on or off");
 }//end routine
 //===================================================================================
 
@@ -483,7 +488,7 @@ void Config::set_config_dict_GW_epsilon  (int *num_dict ,DICT_WORD **dict){
 void Config::set_config_dict_GW_sigma  (int *num_dict ,DICT_WORD **dict){
   //==================================================================================
   //  I) Malloc the dictionary                                              
-  num_dict[0] = 8;
+  num_dict[0] = 10;
   *dict = (DICT_WORD *)cmalloc(num_dict[0]*sizeof(DICT_WORD),"set_dict_gen_GW")-1;
 
   //=================================================================================
@@ -536,7 +541,7 @@ void Config::set_config_dict_GW_sigma  (int *num_dict ,DICT_WORD **dict){
   strcpy((*dict)[ind].error_mes,"an integer");
 
   //-----------------------------------------------------------------------------
-  //  6)\sigma_mode{}
+  //  6)\rho_file{}
   ind =   6;   
   strcpy((*dict)[ind].keyword,"rho_file");
   strcpy((*dict)[ind].keyarg,"rho.dat");
@@ -556,6 +561,18 @@ void Config::set_config_dict_GW_sigma  (int *num_dict ,DICT_WORD **dict){
   strcpy((*dict)[ind].keyarg,"1");
   strcpy((*dict)[ind].error_mes,"an integer");
   //-----------------------------------------------------------------------------
+  //  9)\read_win{}
+  ind =   9;
+  strcpy((*dict)[ind].keyword,"read_win");
+  strcpy((*dict)[ind].keyarg,"off");
+  strcpy((*dict)[ind].error_mes,"on or off");
+  //-----------------------------------------------------------------------------
+  //  10)\ptol{}
+  ind =   10;
+  strcpy((*dict)[ind].keyword,"ptol");
+  strcpy((*dict)[ind].keyarg,"1");
+  strcpy((*dict)[ind].error_mes,"a number > 0 and < 100");
+  //-----------------------------------------------------------------------------  
 }//end routine
 //===================================================================================
 
@@ -691,7 +708,7 @@ void Config::set_config_dict_GW_io  (int *num_dict ,DICT_WORD **dict){
   //==================================================================================
   //  I) Malloc the dictionary                                              
 
-  num_dict[0] = 19;
+  num_dict[0] = 18;
   *dict = (DICT_WORD *)cmalloc(num_dict[0]*sizeof(DICT_WORD),"set_dict_gen_GW")-1;
 
   //=================================================================================
@@ -846,12 +863,6 @@ void Config::set_config_dict_GW_io  (int *num_dict ,DICT_WORD **dict){
   strcpy((*dict)[ind].keyword,"epsilon_inv_verify_prefix");
   strcpy((*dict)[ind].keyarg,"EpsInvIn");
   strcpy((*dict)[ind].error_mes,"a string");
-  //----------------------------------------------------------------------------- 
-
-  ind =   19;
-  strcpy((*dict)[ind].keyword,"p_matrix_n3");
-  strcpy((*dict)[ind].keyarg,"off");
-  strcpy((*dict)[ind].error_mes,"on or off");
   //----------------------------------------------------------------------------- 
 }//end routine
 //===================================================================================
@@ -1052,6 +1063,11 @@ void Config::set_config_params_GW_epsilon  (DICT_WORD *dict, char *fun_key, char
   if (strlen(gw_epsilon->occFileName) == 0){keyarg_barf(dict,input_name,fun_key,ind);}
   //----------------------------------------------------------------------------- 
 
+  ind =   7;
+  parse_on_off(dict[ind].keyarg,&int_arg,&ierr);
+  if (ierr==1){keyarg_barf(dict,input_name,fun_key,ind);}
+  gw_epsilon->n3_p = (int_arg==1?true:false);  //if int_arg ==1, then true 
+
 }// end routine
 //================================================================================
 
@@ -1107,24 +1123,39 @@ void Config::set_config_params_GW_sigma  (DICT_WORD *dict, char *fun_key, char *
   if (int_arg<0){keyarg_barf(dict,input_name,fun_key,ind);}
   gw_sigma->sigma_mode = int_arg; 
 
+  //-----------------------------------------------------------------------------
   // 6) rho (density) filename 
   ind =   6;
   strcpy(gw_sigma->rhoFilename, dict[ind].keyarg); // must put somewhere!
   if (strlen(gw_sigma->rhoFilename) == 0){keyarg_barf(dict,input_name,fun_key,ind);}  
 
-     //-----------------------------------------------------------------------------
-  //  5)\proc_rows{}
+  //-----------------------------------------------------------------------------
+  //  7)\proc_rows{}
   ind =   7;   
   sscanf(dict[ind].keyarg,"%d",&int_arg);
   if (int_arg<0){keyarg_barf(dict,input_name,fun_key,ind);}
   gw_sigma->proc_rows = int_arg; 
 
-     //-----------------------------------------------------------------------------
-  //  5)\proc_cols{}
+  //-----------------------------------------------------------------------------
+  //  8)\proc_cols{}
   ind =   8;   
   sscanf(dict[ind].keyarg,"%d",&int_arg);
   if (int_arg<0){keyarg_barf(dict,input_name,fun_key,ind);}
-  gw_sigma->proc_cols = int_arg; 
+  gw_sigma->proc_cols = int_arg;
+
+  //-----------------------------------------------------------------------------
+  //  9)\read_win{}
+  ind =   9;
+  parse_on_off(dict[ind].keyarg,&int_arg,&ierr);
+  if (ierr==1){keyarg_barf(dict,input_name,fun_key,ind);}
+  gw_sigma->read_win = (int_arg==1?true:false);  //if int_arg ==1, then true
+
+  //-----------------------------------------------------------------------------
+  // 10) \ptol{} tolerance of the N3 Sigma windowing should be between 0 and 1
+  ind = 10;
+  sscanf(dict[ind].keyarg,"%lg",&real_arg);
+  if (real_arg<0 || real_arg > 100){keyarg_barf(dict,input_name,fun_key,ind);}  
+  gw_sigma->ptol = real_arg;
   //----------------------------------------------------------------------------- 
 }// end routine
 //================================================================================
@@ -1350,11 +1381,6 @@ void Config::set_config_params_GW_io  (DICT_WORD *dict, char *fun_key, char *inp
   gw_io->epsilon_inv.verify_prefix = dict[ind].keyarg;
   if (strlen(gw_io->epsilon_inv.verify_prefix.c_str()) == 0){keyarg_barf(dict,input_name,fun_key,ind);}  
   //-----------------------------------------------------------------------------
-  //  18)\p_matrix_n3{}
-  ind =   19;   
-  parse_on_off(dict[ind].keyarg,&int_arg,&ierr);
-  if (ierr==1){keyarg_barf(dict,input_name,fun_key,ind);}
-  gw_io->p_matrix.n3 = (int_arg==1?true:false);  //if int_arg ==1, then true 
 
 }// end routine
 //================================================================================

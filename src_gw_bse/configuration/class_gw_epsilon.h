@@ -32,6 +32,7 @@ class GW_EPSILON{
     double tol_iter;             // Num: Tolerance of the iterative matrix inversion method
     char eigFileName[200];       // No need to pup this, contents stored in Eocc and Eunocc
     char occFileName[200];
+    bool n3_p; 
     //----------------
     //con-destruct:
     GW_EPSILON(){
@@ -59,6 +60,7 @@ class GW_EPSILON{
       p | nkpt;
       p | nocc;
       p | nunocc;
+      p | n3_p;
 
       // pupping arrays
       if (p.isUnpacking()) {
@@ -109,6 +111,7 @@ class GW_EPSILON{
       fprintf(fp,"tol_iter %lg\n",tol_iter);
       fprintf(fp,"nocc %d\n",nocc);
       fprintf(fp,"nunocc %d\n",nunocc);
+      fprintf(fp,"n3_p %d\n",n3_p);
       for (int s = 0; s < nspin; s++) {
         for (int k = 0; k < nkpt; k++) {
           for (int i = 0; i < nocc; i++) {

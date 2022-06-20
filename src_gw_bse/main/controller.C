@@ -162,6 +162,8 @@ PsiCache::PsiCache() {
   n_np = gw_sigma->num_sig_matels;
   n_list = gw_sigma->n_list_sig_matels;
   np_list = gw_sigma->np_list_sig_matels;
+  read_win = gw_sigma->read_win;
+  ptol_sigma = gw_sigma->ptol;
   qindex = 0;
   elements = 0;
   int dim = gwbse->gw_parallel.n_elems/gwbse->gw_parallel.rows_per_chare;
@@ -225,7 +227,7 @@ PsiCache::PsiCache() {
 
   lp = new LAPLACE(gwbse->gw_epsilon.Eocc, gwbse->gw_epsilon.Eunocc);
   WIN = new WINDOWING(gwbse->gw_epsilon.Eocc, gwbse->gw_epsilon.Eunocc);
-  // WIN->read_from_file();
+  
   char fromFile[200];
   Occ_occ = new double**[1];
   Occ_unocc = new double**[1];
@@ -276,17 +278,20 @@ complex* PsiCache::get_gpp_eigv(int alpha) {
 }
 
 void PsiCache::calculate_windows() {
-  double w = 0.23161204729081489;
-  char sigma[] = "Sigma";
+  double w = 0.23161204729081489; // kayahans (hard_coded for 2-atom Si 3-3 n-n' at gamma)
   WIN->sigma_win(w, gpp_omsq, ng);
-  WIN->searchwins(sigma); // on the fly windowing optimization
-  // WIN->read_from_file();
-  // if (thisIndex == 0) {
-  //   printf("Index omsq eigv\n");
-  //   for (int i =0; i < ng; i++) {
-  //     printf("%d %f %f \n", i, gpp_omsq[i], gpp_eige[i]);
-  //   }
-  // }
+  if (read_win) {
+    if (thisIndex == 0) {
+      CkPrintf("[PSICACHE] Reading N3 Sigma windows from sigmaHGLinfo.dat\n");
+    }
+    WIN->read_from_file();
+  } else {
+    if (thisIndex == 0) {
+      CkPrintf("[PSICACHE] On the fly N3 Sigma windows\n");
+    }
+    char sigma[] = "Sigma";
+    WIN->searchwins(sigma);
+  }
   contribute(CkCallback(CkReductionTarget(Controller,gpp_windows_ready), controller_proxy));
 }
 

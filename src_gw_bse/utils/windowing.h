@@ -106,17 +106,18 @@ class WINDOWING {
   WINDOWING() {};
   WINDOWING(double*** e_occ, double*** e_unocc) {
     GWBSE *gwbse = GWBSE::get();
+    GW_SIGMA *gw_sigma = &(gwbse->gw_sigma);
     int nocc = gwbse->gw_parallel.L;
     int nunocc = gwbse->gw_parallel.M;
     int nspin = 1; 
     int nkpt = gwbse->gw_parallel.K;
-    // printf("WIN %d %d %d %d\n", nocc, nunocc, nspin, nkpt);
-    initialize(e_occ, e_unocc, nocc,nunocc, nspin, nkpt);
+    double ptol = gw_sigma->ptol;
+    initialize(e_occ, e_unocc, nocc,nunocc, nspin, nkpt, ptol);
   }
 
   void sigma_win(const double w, double* const omsq, int const ng);
   void read_from_file();
-  void initialize(double*** e_occ, double*** e_unocc, int nocc, int nunocc, int nspin, int nkpt);
+  void initialize(double*** e_occ, double*** e_unocc, int nocc, int nunocc, int nspin, int nkpt, double ptol);
   void printenergies() const;
   void printparameters() const;
   void searchwins(char*);

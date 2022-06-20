@@ -202,6 +202,8 @@ class PsiCache : public CBase_PsiCache {
     complex** gpp_eigv;
     double* gpp_eige;
     double* gpp_omsq;
+    bool read_win;
+    bool ptol_sigma;
     std::vector<std::pair<int, int>> regions;
     double get_OccOcc(int k, int iv);
   private:

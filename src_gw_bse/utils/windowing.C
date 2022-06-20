@@ -40,7 +40,6 @@ bool WINPAIR::in_window(const double &a, const int& w_number, const int& _sigma_
 
 double WINPAIR::find_zeta() const {
   if (!isHgl) {
-
     double G = gap;     // min(Ec-Ev)
     double W = bw;   // max(Ec-Ev)
     int ng = nodes.size();      // number of Gauss-Laguerre quadrature node
@@ -187,17 +186,17 @@ void WINDOWING::set_winpairs() {
     }
 }  // end set_pairs
 
-void WINDOWING::initialize(double*** e_occ, double*** e_unocc, int _nocc, int _nunocc, int _nspin, int _nkpt) {
+void WINDOWING::initialize(double*** e_occ, double*** e_unocc, int _nocc, int _nunocc, int _nspin, int _nkpt, double _ptol) {
     nspin   = _nspin;
     nq      = _nkpt;  // FIXME
     nkpt    = _nkpt;
     double _eV      = 1./27.2114;
-    ptol            = 1;                  // (hard coded)
+    ptol            = _ptol;                  // (hard coded)
     errfrac         = ptol/100;             // Percent tolerance converted to errfrac
     min_gap         = 0.1*_eV;              // (hard coded) Minimum gap to be considered metallic (0.1 eV)
     max_windows[0]  = 5;                    // (hard coded)
     max_windows[1]  = 10;                   // (hard coded)
-    omega           = 0.23161204729081489;  // (hard coded) For Si!
+    omega           = -10E6;
 
     // below assuming insulator
     nv          = _nocc   * _nkpt;
@@ -312,7 +311,6 @@ void WINDOWING::read_from_file() {
     int nwPPocc(0);
     // read omega
     fscanf(fp, "%lf\n", &omega);
-    // printf("omega: %f\n",omega);
     // read data for occupied states
     fscanf(fp, "%d %d\n", &nwocc, &nwPPocc);
     double _occwin_i(0);
@@ -425,23 +423,6 @@ void WINDOWING::read_from_file() {
     // printf("read_windows done\n");
   }  // end if
 }
-// void WINDOWING::loadparameters(const USRINPUT usrin) {
-//     // defaults
-//     // (kayahans) keep default for now
-//     // double check later if it works for metal
-//     double _eV       = 1./27.2114;
-//     ptol            = usrin.ptol;
-//     errfrac         = ptol/100;             // Percent tolerance converted to errfrac
-//     min_gap         = 0.1*_eV;              // (hard coded) Minimum gap to be considered metallic (0.1 eV)
-//     max_windows[0]  = 5;                    // (hard coded)
-//     max_windows[1]  = 10;                   // (hard coded)
-//     omega           = 0.23161204729081489;  // (hard coded) For Si!
-
-//     int _nkpt   = usrin.nkpt;
-//     int _nstate = usrin.nstate * _nkpt;
-//     nv          = usrin.nocc   * _nkpt;
-//     nc          = usrin.nunocc * _nkpt;
-//   }
 
 void WINDOWING::printenergies() const {
     for (int i = 0; i < eigs.size(); i++) {
