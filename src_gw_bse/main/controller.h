@@ -239,6 +239,7 @@ class PsiCache : public CBase_PsiCache {
     int ndata_rho;
     int *nr;
     int *n_list, *np_list;
+  
     double vcoulb_0;
     
     double total_time;

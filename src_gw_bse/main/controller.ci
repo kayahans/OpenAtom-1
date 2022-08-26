@@ -493,8 +493,8 @@ module controller {
       }
       // TODO(kayahans): change here later
       when GppFormed() serial{
-        eps_matrix2D_X_proxy.bareExchange();
         START_STEP("Sigma N3 Initialized");
+        eps_matrix2D_X_proxy.bareExchange();
         pmatrix2D_proxy.sigma_init(accept_result);
         psi_cache_proxy.calculate_windows();
       }

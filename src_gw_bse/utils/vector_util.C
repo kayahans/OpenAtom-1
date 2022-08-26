@@ -16,7 +16,6 @@
 #include <numeric>
 #include <iostream>
 #include <vector>
-#include "./util.h"
 #include "./vector_util.h"
 
 std::vector<double> linspace(const double a, const double b, const int N) {

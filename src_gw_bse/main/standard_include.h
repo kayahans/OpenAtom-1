@@ -24,5 +24,8 @@
 #ifdef USE_LAPACK
 #include "cblas.h"
 #endif
+#ifdef USE_MKL
+#include "mkl_lapacke.h"
+#endif
 
 #endif

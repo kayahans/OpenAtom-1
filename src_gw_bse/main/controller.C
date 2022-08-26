@@ -163,7 +163,6 @@ PsiCache::PsiCache() {
   n_list = gw_sigma->n_list_sig_matels;
   np_list = gw_sigma->np_list_sig_matels;
   read_win = gw_sigma->read_win;
-  ptol_sigma = gw_sigma->ptol;
   qindex = 0;
   elements = 0;
   int dim = gwbse->gw_parallel.n_elems/gwbse->gw_parallel.rows_per_chare;
@@ -278,7 +277,8 @@ complex* PsiCache::get_gpp_eigv(int alpha) {
 }
 
 void PsiCache::calculate_windows() {
-  double w = 0.23161204729081489; // kayahans (hard_coded for 2-atom Si 3-3 n-n' at gamma)
+  GWBSE *gwbse = GWBSE::get();
+  double w =  gwbse->gw_sigma.w; 
   WIN->sigma_win(w, gpp_omsq, ng);
   if (read_win) {
     if (thisIndex == 0) {
@@ -608,7 +608,7 @@ void computeF(int first, int last, void* result, int count, void* params) {
         #ifdef USE_LAPACK
         // BLAS calls compute the complex conjugate of P, which is hermitian. This
         // change to f corrects that so we get the correct P.
-        f[j] = f[j].conj();
+          f[j] = f[j].conj();
         #endif
         f[j] *= scaling_factor;
       }

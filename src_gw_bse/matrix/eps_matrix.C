@@ -732,7 +732,7 @@ void DiagBridge::prepareData(int qindex, int eps_size, int num_qpts) {
   // eps_size: rank of the matrix for an N x N invertable matrix size is N
   // qindex: q index of the epsilon. Not really needed here, but used in debugging
 
-  int mype = CkMyPe();
+  int mynode = CkMyNode();
   
   // Possible Charm++ tile sizes 
   int remElems2 = eps_size % eps_rows;  
@@ -764,14 +764,14 @@ void DiagBridge::prepareData(int qindex, int eps_size, int num_qpts) {
   int x_num_tiles = 0; // num of charm++ tiles in row dimension
   int y_num_tiles = 0; // num of charm++ tiles in col dimension
 
-  
+  // printf(" proc %d %d mynode %d \n", proc_rows, proc_cols, mynode);
   for (int x=0; x < numx; x++) {
     for (int y=0; y < numy; y++) {
-      int dest_pe_row = x%proc_rows;
-      int dest_pe_col = y%proc_cols;
-      int dest_pe = dest_pe_row*proc_cols + dest_pe_col;
-
-      if (dest_pe == mype) {
+      int dest_node_row = x%proc_rows;
+      int dest_node_col = y%proc_cols;
+      int dest_node = dest_node_row*proc_cols + dest_node_col;
+      // printf(" destpe %d \n",dest_node);
+      if (dest_node == mynode) {
         if (x > x_prev) {
           x_prev = x;
           x_num_tiles += 1;
@@ -819,7 +819,7 @@ void DiagBridge::prepareData(int qindex, int eps_size, int num_qpts) {
 
   row_size = row_size / y_num_tiles;
   col_size = col_size / x_num_tiles;
-
+  // printf("totaldata %d row/col %d %d \n", totaldata, row_size, col_size);
   // Setup the container to be transferred to MPI
   diagData = new diagData_t;
   diagData->qindex = qindex;
@@ -832,14 +832,12 @@ void DiagBridge::prepareData(int qindex, int eps_size, int num_qpts) {
   diagData->npcol = proc_cols;
   diagData->nb = eps_rows;
   diagData->n = eps_size;
-
+  
   diagData->input = new std::complex<double>[totaldata];
   // TODO (kayahans): Not sure which pe gets the final result, for now allocate this in all 
   // Later when we decide how to distribute eigenvectors/values, we can make this smarter
   // diagData->eig_e = new std::complex<double>[eps_size];
   diagData->eig_e = new double[eps_size];
-  // diagData->eig_v = new std::complex<double>[eps_size*eps_size];  
-  // diagData->eig_v = new matel[eps_size*eps_size];  
   // kayahan debug
   // CkPrintf("[DIAGONALIZER] Created a pointer with totalsize %d numblocks %d for S matrix global dim %d at pe %d for qindex %d\n", totaldata, numBlocks, eps_size, CkMyPe(), qindex);
   contribute(CkCallback(CkReductionTarget(Controller, diag_setup), controller_proxy));

@@ -94,7 +94,7 @@ module eps_matrix {
   };
   // end array EpsMatrix
 
-group DiagBridge{
+nodegroup DiagBridge{
     entry DiagBridge();
     entry void prepareData(int qindex, int size, int num_qpts);
     entry void copyToMPI(int qindex, int real_epsilon_size, CProxy_EpsMatrix eps_matrix2D_proxy) {
@@ -106,22 +106,22 @@ group DiagBridge{
       // This is not guaranteed to work for non-square matrices
       serial {
         // printf("Numblocks: %d realepsilonsize %d\n", numBlocks, real_epsilon_size);
-        int mype = CkMyPe();
+        int mynode = CkMyNode();
         for (int tile_row = 0; tile_row < numBlocks; tile_row++) {
           for (int tile_col = 0; tile_col < numBlocks; tile_col++) { 
-            int dest_pe_row = tile_row%proc_rows;
-            int dest_pe_col = tile_col%proc_cols;
-            // PE array is row major, hence dest_pe below
+            int dest_node_row = tile_row%proc_rows;
+            int dest_node_col = tile_col%proc_cols;
+            // PE array is row major, hence dest_node below
             // https://www.netlib.org/scalapack/slug/node70.html
-            int dest_pe = dest_pe_row*proc_cols + dest_pe_col;
-            // CkPrintf("pe %d eps_tile r/c %d %d \n",mype, tile_row, tile_col);
-            if (mype == dest_pe) { 
+            int dest_node = dest_node_row*proc_cols + dest_node_col;
+            if (mynode == dest_node) { 
+              // CkPrintf("node %d eps_tile r/c %d %d \n",mynode, tile_row, tile_col);
               DiagMessage* msg;
               msg = new DiagMessage();
               msg->eps_size = real_epsilon_size;
               msg = eps_matrix2D_proxy(tile_row, tile_col).receiveDataSimple(msg);
-              int loc_tile_row = (tile_row - dest_pe_row) / proc_rows;
-              int loc_tile_col = (tile_col - dest_pe_col) / proc_cols;
+              int loc_tile_row = (tile_row - dest_node_row) / proc_rows;
+              int loc_tile_col = (tile_col - dest_node_col) / proc_cols;
               
               int start_index = ((loc_tile_col * diagData->row_size) + loc_tile_row) * eps_rows;
               int bl_cyclic_index;
@@ -141,16 +141,16 @@ group DiagBridge{
     } // end copyToMPI
     entry void copyFromMPI(int qindex, int real_epsilon_size, CProxy_EpsMatrix eps_matrix2D_proxy, CProxy_Gpp gpp2D_proxy) {
       serial {
-        // int mype = CkMyPe();
-        int mype = CkMyPe();
+        // int mynode = CkMyPe();
+        int mynode = CkMyNode();
         // Local matrix output from scalapack (Z) is row_size X col_size matrix
         // Divide these by block sizes (eps_rows/cols), then you get tiling of 
         // the scalapack matrix (Z) with num_tile_row x num_tile_col
         int num_tile_row = (row_size-1)/eps_rows + 1;
         int num_tile_col = (col_size-1)/eps_cols + 1;
         // Processors are distributed column major
-        int pe_row = mype / proc_cols;
-        int pe_col = mype % proc_cols;
+        int pe_row = mynode / proc_cols;
+        int pe_col = mynode % proc_cols;
         // TODO(kayahans) hardcoded
         std::vector<double> eig(diagData->eig_e, diagData->eig_e + real_epsilon_size);
         gpp2D_proxy.recv_eig(eig);
@@ -197,7 +197,7 @@ group DiagBridge{
             msg->rows = num_loc_rows;
             msg->cols = num_loc_cols;
             // kayahan debug
-            // CkPrintf("pe %d inputsize %d idx r/c %d/%d eps r/c %dx%d \n", mype, totaldata, idx_row, idx_col, eps_row_idx, eps_col_idx);
+            // CkPrintf("pe %d inputsize %d idx r/c %d/%d eps r/c %dx%d \n", mynode, totaldata, idx_row, idx_col, eps_row_idx, eps_col_idx);
 
             int start_index = (idx_col * dd_row_size) * eps_cols + idx_row * eps_rows;
             // // int start_index = (idx_row * dd_col_size) * eps_rows + idx_col * eps_cols;
@@ -226,7 +226,7 @@ group DiagBridge{
                 int global_col = glob_start_col + j;
               //   if (eps_row_idx == 1 && eps_col_idx == 1) {
               //   CkPrintf("[CopyFrom] diag-pe %d (%dx%d) inputsize %d (%dx%d) local_r/c %d %d bl %d r/c %d %d idx %d global_rc %d %d val %.8e\n", 
-              //                            mype, pe_row, pe_col, 
+              //                            mynode, pe_row, pe_col, 
               //                            totaldata, row_size, col_size, 
               //                            idx_row, idx_col, 
               //                            bl_cyclic_index, 
@@ -241,13 +241,13 @@ group DiagBridge{
                 
                 // msg->eigenvalues[j].im = diagData->eig_e[glob_start_col+j].imag();
                 // CkPrintf("Eig %d %f %f\n",i, diagData->eig_e[glob_start_col+j].real(), diagData->eig_e[glob_start_col+j].imag() );
-                // if (mype == 0 && j == 0)
+                // if (mynode == 0 && j == 0)
                 //   CkPrintf("Eig %d %f\n",i+glob_start_row, diagData->eig_e[glob_start_row+i]);
               }
               // msg = eps_matrix2D_proxy(eps_row_idx, eps_col_idx).sendDataSimple(msg);
               msg = eps_matrix2D_proxy(eps_col_idx, eps_row_idx).sendDataSimple(msg);
             // delete msg;
-            // CkPrintf("pe %d inputsize %d tile r/c %d/%d block %dx%d start %d\n", mype, totaldata, idx_row, idx_col, num_loc_rows, num_loc_cols, start_index);
+            // CkPrintf("pe %d inputsize %d tile r/c %d/%d block %dx%d start %d\n", mynode, totaldata, idx_row, idx_col, num_loc_rows, num_loc_cols, start_index);
             } 
           } // end for tile_col
         } // end for tile_row

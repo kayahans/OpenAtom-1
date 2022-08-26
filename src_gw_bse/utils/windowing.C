@@ -191,12 +191,12 @@ void WINDOWING::initialize(double*** e_occ, double*** e_unocc, int _nocc, int _n
     nq      = _nkpt;  // FIXME
     nkpt    = _nkpt;
     double _eV      = 1./27.2114;
-    ptol            = _ptol;                  // (hard coded)
+    ptol            = _ptol;
     errfrac         = ptol/100;             // Percent tolerance converted to errfrac
     min_gap         = 0.1*_eV;              // (hard coded) Minimum gap to be considered metallic (0.1 eV)
-    max_windows[0]  = 5;                    // (hard coded)
-    max_windows[1]  = 10;                   // (hard coded)
-    omega           = -10E6;
+    max_windows[0]  = 5;                    // (hard coded, make input parameter)
+    max_windows[1]  = 10;                   // (hard coded, make input parameter)
+    omega           = -10E6;                // Evaluation frequency
 
     // below assuming insulator
     nv          = _nocc   * _nkpt;
@@ -238,30 +238,6 @@ void WINDOWING::initialize(double*** e_occ, double*** e_unocc, int _nocc, int _n
     gap         = ecmin - evmax;
 }
 
-// void WINDOWING::loadgpp(double*** omsq, int* ng, const SYSINFO& sys) {
-//     const int _nspin   = sys.nspin;
-//     const int _nq      = sys.nkpt;  // FIXME 
-//     std::vector<double> _wppsq;
-//     for (int is = 0; is < _nspin; is++) {
-//         for (int iq = 0; iq < _nq; iq++) {
-//             double* _wpp = omsq[is][iq];
-//             int _ng = ng[iq];
-//             _wppsq.insert(_wppsq.end(), _wpp, _wpp+_ng);
-//         }
-//     }
-//     std::vector<double> _wpp_pos;
-//     for (double i : _wppsq) {
-//         if (i > 0) {
-//             _wpp_pos.push_back(sqrt(i));
-//         }
-//     }
-//     std::sort(_wpp_pos.begin(), _wpp_pos.end());  // sorted
-//     // Use only positive values, negative values are unphysical
-
-//     wpp = _wpp_pos;
-//     wppmin = wpp.front();  // first element
-//     wppmax = wpp.back();   // last element
-// }
 /**
  * @brief Load windowing parameters for a matrix element Sigma_nn'
  * 
@@ -273,18 +249,11 @@ void WINDOWING::sigma_win(const double _w, double* const omsq, int const ng) {
     omega = _w;
     // printf("omega sigmawin %f\n", omega);
     std::vector<double> _wppsq;
-    // for (int is = 0; is < nspin; is++) {
-    //     for (int iq = 0; iq < nq; iq++) {
-            // double* _wpp = omsq[is][iq];
-            double* _wpp = omsq;
-            // int _ng = ng[iq];
-            int _ng = ng;
-            _wppsq.insert(_wppsq.end(), _wpp, _wpp+_ng);
-    //     }
-    // }
-    // print_vector(_wppsq);
-    // FIXME using only positive ones here!
+    double* _wpp = omsq;
+    int _ng = ng;
+    _wppsq.insert(_wppsq.end(), _wpp, _wpp+_ng);
     std::vector<double> _wpp_pos;
+    // Using only positive Wpp
     for (double i : _wppsq) {
         if (i > 0) {
             _wpp_pos.push_back(sqrt(i));
@@ -416,11 +385,10 @@ void WINDOWING::read_from_file() {
         winpairs.push_back(winp);
       }
     }
-    double gamma(0);  // FIXME
+    double gamma(0);
     // read gamma
     fscanf(fp, "%lg", &gamma);
     fclose(fp);
-    // printf("read_windows done\n");
   }  // end if
 }
 
@@ -439,7 +407,7 @@ void WINDOWING::printparameters() const {
     printf("\tHOMO - LUMO gap: %f Ha\n", ecmin - evmax);
     printf("\tErrfrac : %f (equal to ptol = %f)\n", errfrac, ptol);
     printf("\tMinimum gap: %f Ha \n", min_gap);
-    printf("\tMax valence and conduction windows : (%d, %d) \n", max_windows[0], max_windows[1]);
+    printf("\tMax state eigenvalues and PP windows : (%d, %d) \n", max_windows[0], max_windows[1]);
     printf("\tOptimized number of windows: %d %d\n", opt_num_windows[0], opt_num_windows[1]);
     int i = 0;
     for (WINPAIR wp : winpairs) { 
@@ -646,7 +614,7 @@ double WINDOWING::fixed_win_optimizer(std::vector<double>& eawins,
     double dE_b = ebwins[1] - ebwins[0];  // Since this was initialized in log scale, this is the smallest step size 
     double dEaderiv = dE_a/100;
     double dEbderiv = dE_b/100;
-    // printf("dE_a=%f, dE_b=%f\n", dE_a, dE_b);
+    // printf("Naw Nbw %d/%d dE_a=%f, dE_b=%f\n", Naw, Nbw, dE_a, dE_b);
     // Define cost function
     // Initial cost
     double cost = costfun(eawins, ebwins, ea, eb);
@@ -684,6 +652,8 @@ double WINDOWING::fixed_win_optimizer(std::vector<double>& eawins,
                 ebwins[m] += dEbderiv;
                 // printf("After\n");
                 // print_vector(ebwins);
+                // print_vector(ea);
+                // print_vector(eb);
                 costm      = costfun(eawins, ebwins, ea, eb);
                 ebwins[m] -= dEbderiv;
                 dcostm[m]  = (costm-cost)/dEbderiv;

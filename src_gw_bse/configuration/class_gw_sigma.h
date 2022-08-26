@@ -21,7 +21,8 @@ class GW_SIGMA{
     char nnpFileName[200];       // No need to pup this, contents stored in next three variables
     int num_sig_matels;  // number of <n|Sigma|n'> elements to calculate in GW
     int *n_list_sig_matels, *np_list_sig_matels;  // n an n' lists
-    
+    double w; // evaluation frequency for each n and n'
+
     double screened_coulomb_cutoff;     // Num: Cutoff for screened coulomb term (must be less than Ecuteps (eV)
     double bare_coulomb_cutoff;         // Num: cutoff for bare coulomb (eV)
     
@@ -46,6 +47,7 @@ class GW_SIGMA{
       num_sig_matels = 0;
       n_list_sig_matels = 0;
       np_list_sig_matels = 0;
+      w = 0;
       sigma_mode = 0;
       ptol = 0.0;
       read_win = false;
@@ -70,6 +72,7 @@ class GW_SIGMA{
       p | screened_coulomb_cutoff;
       p | bare_coulomb_cutoff;
       p | sigma_mode;
+      p | w;
       p | ptol;
       p | read_win;
       p | proc_rows;
@@ -104,7 +107,7 @@ class GW_SIGMA{
       fprintf(fp,"PP_nmode %d\n",PP_nmode);
       fprintf(fp,"n and n' list for sigma matrix elements is %d long\n",num_sig_matels);
       for (int i=0; i < num_sig_matels; i++) {
-        	fprintf(fp,"%d %d\n",n_list_sig_matels[i],np_list_sig_matels[i]);
+        	fprintf(fp,"%d %d\n", n_list_sig_matels[i],np_list_sig_matels[i]);
       }
       //dbles
       fprintf(fp,"screened_coulomb_cutoff %lg\n",screened_coulomb_cutoff);
